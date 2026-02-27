@@ -97,7 +97,95 @@ switch ($strona) {
         }
         break;
     case 'wpis':
-        echo '<h1>Wpis</h1>';
+        $wpis_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+        if ($wpis_id <= 0) {
+            echo '<p>Nieprawidłowy identyfikator wpisu.</p>';
+            break;
+        }
+
+        try {
+            $stmt = $polaczenie->prepare(
+                'SELECT w.id, w.tytul, w.tresc, w.link, u.nazwa AS autor, w.wynik, w.data_dodania
+                 FROM wpisy_z_wynikiem w
+                 JOIN uzytkownicy u ON u.id = w.autor_id
+                 WHERE w.id = :id'
+            );
+            $stmt->execute([':id' => $wpis_id]);
+            $wpis = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania wpisu: ' . $e->getMessage());
+            $wpis = null;
+        }
+
+        if (!$wpis) {
+            echo '<p>Nie znaleziono wpisu.</p>';
+            break;
+        }
+
+        $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+        $autor = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
+        $wynik = (int)$wpis['wynik'];
+        $data  = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
+
+        echo '<article style="background:#fff;border-radius:6px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
+        echo '<h1 style="margin-bottom:0.75rem;">' . $tytul . '</h1>';
+
+        if (!empty($wpis['tresc'])) {
+            echo '<div style="margin-bottom:1rem;line-height:1.6;">' . nl2br(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
+        }
+        if (!empty($wpis['link'])) {
+            $link_raw = $wpis['link'];
+            $link_schema = strtolower(parse_url($link_raw, PHP_URL_SCHEME));
+            if (in_array($link_schema, ['http', 'https'], true)) {
+                $link = htmlspecialchars($link_raw, ENT_QUOTES, 'UTF-8');
+                echo '<p style="margin-bottom:1rem;"><a href="' . $link . '" rel="noopener noreferrer" target="_blank">' . $link . '</a></p>';
+            }
+        }
+
+        echo '<p style="font-size:0.85rem;color:#555;">';
+        echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
+        echo 'Wynik: <strong>' . $wynik . '</strong> &nbsp;|&nbsp; ';
+        echo $data;
+        echo '</p>';
+        echo '</article>';
+
+        try {
+            $stmt = $polaczenie->prepare(
+                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania
+                 FROM komentarze k
+                 JOIN uzytkownicy u ON u.id = k.autor_id
+                 WHERE k.wpis_id = :wpis_id
+                 ORDER BY k.data_dodania ASC'
+            );
+            $stmt->execute([':wpis_id' => $wpis_id]);
+            $komentarze = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania komentarzy: ' . $e->getMessage());
+            $komentarze = [];
+        }
+
+        echo '<section style="margin-top:2rem;">';
+        echo '<h2 style="margin-bottom:1rem;">Komentarze (' . count($komentarze) . ')</h2>';
+
+        if (empty($komentarze)) {
+            echo '<p>Brak komentarzy.</p>';
+        } else {
+            echo '<ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">';
+            foreach ($komentarze as $komentarz) {
+                $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
+                $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
+                $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
+                echo '<li style="background:#fff;border-radius:6px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
+                echo '<div style="font-size:0.85rem;color:#555;margin-bottom:0.4rem;">';
+                echo '<strong>' . $k_autor . '</strong> &nbsp;|&nbsp; ' . $k_data;
+                echo '</div>';
+                echo '<div>' . nl2br($k_tresc) . '</div>';
+                echo '</li>';
+            }
+            echo '</ul>';
+        }
+        echo '</section>';
         break;
     case 'dodaj':
         if (!isset($_SESSION['uzytkownik_id'])) {
