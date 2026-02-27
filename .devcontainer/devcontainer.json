@@ -19,5 +19,6 @@
       ]
     }
   },
-  "remoteUser": "www-data"
+  "remoteUser": "www-data",
+  "initializeCommand": "test -f .env || cp .env.example .env"
 }
