@@ -60,7 +60,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION zarejestruj_uzytkownika(p_nazwa TEXT, p_haslo TEXT)
-RETURNS VOID AS $$
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     INSERT INTO uzytkownicy (nazwa, haslo_hash)
     VALUES (p_nazwa, crypt(p_haslo, gen_salt('bf')));
@@ -68,4 +72,4 @@ EXCEPTION
     WHEN unique_violation THEN
         RAISE EXCEPTION 'Użytkownik o nazwie "%" już istnieje.', p_nazwa;
 END;
-$$ LANGUAGE plpgsql;
+$$;
