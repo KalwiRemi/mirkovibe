@@ -59,6 +59,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION dodaj_glos_komentarz(p_uzytkownik_id INT, p_komentarz_id INT, p_wartosc SMALLINT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    INSERT INTO glosy (uzytkownik_id, komentarz_id, wartosc)
+    VALUES (p_uzytkownik_id, p_komentarz_id, p_wartosc)
+    ON CONFLICT (uzytkownik_id, komentarz_id)
+    DO UPDATE SET wartosc = EXCLUDED.wartosc;
+END;
+$$;
+
 CREATE FUNCTION zarejestruj_uzytkownika(p_nazwa TEXT, p_haslo TEXT)
 RETURNS VOID
 LANGUAGE plpgsql
