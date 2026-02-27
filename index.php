@@ -21,7 +21,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz'];
 
 function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = ''): string {
     $html  = '<div id="komentarze-sekcja">';
@@ -33,12 +33,19 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     } else {
         $html .= '<ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">';
         foreach ($komentarze as $komentarz) {
+            $k_id    = (int)$komentarz['id'];
             $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
             $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
             $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
+            $k_wynik = (int)($komentarz['wynik'] ?? 0);
             $html .= '<li style="background:#fff;border-radius:6px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
             $html .= '<div style="font-size:0.85rem;color:#555;margin-bottom:0.4rem;">';
             $html .= '<strong>' . $k_autor . '</strong> &nbsp;|&nbsp; ' . $k_data;
+            $html .= ' &nbsp;|&nbsp; Wynik: <span id="wynik-komentarza-' . $k_id . '"><strong>' . $k_wynik . '</strong></span>';
+            if ($zalogowany) {
+                $html .= ' <button type="button" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
+                $html .= ' <button type="button" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+            }
             $html .= '</div>';
             $html .= '<div>' . nl2br($k_tresc) . '</div>';
             $html .= '</li>';
@@ -202,10 +209,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania
+                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania,
+                        COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
+                 LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
+                 GROUP BY k.id, k.tresc, u.nazwa, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -431,10 +441,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania
+                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania,
+                        COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
+                 LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
+                 GROUP BY k.id, k.tresc, u.nazwa, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -481,6 +494,43 @@ switch ($strona) {
             echo '<strong>' . (int)$wynik_raw . '</strong>';
         } catch (PDOException $e) {
             error_log('Błąd głosowania: ' . $e->getMessage());
+            http_response_code(500);
+        }
+        exit;
+    case 'glosuj_komentarz':
+        ob_end_clean();
+        if (!isset($_SESSION['uzytkownik_id'])) {
+            http_response_code(403);
+            exit;
+        }
+
+        $komentarz_id = isset($_POST['komentarz_id']) ? (int)$_POST['komentarz_id'] : 0;
+        $wartosc      = isset($_POST['wartosc'])      ? (int)$_POST['wartosc']      : 0;
+
+        if ($komentarz_id <= 0 || !in_array($wartosc, [1, -1], true)) {
+            http_response_code(400);
+            exit;
+        }
+
+        try {
+            $stmt = $polaczenie->prepare('SELECT dodaj_glos_komentarz(:uzytkownik_id, :komentarz_id, CAST(:wartosc AS SMALLINT))');
+            $stmt->bindValue(':uzytkownik_id', $_SESSION['uzytkownik_id'], PDO::PARAM_INT);
+            $stmt->bindValue(':komentarz_id',  $komentarz_id,              PDO::PARAM_INT);
+            $stmt->bindValue(':wartosc',        $wartosc,                   PDO::PARAM_INT);
+            $stmt->execute();
+
+            $stmt2 = $polaczenie->prepare(
+                'SELECT COALESCE(SUM(g.wartosc), 0)
+                 FROM glosy g
+                 WHERE g.komentarz_id = :komentarz_id'
+            );
+            $stmt2->bindValue(':komentarz_id', $komentarz_id, PDO::PARAM_INT);
+            $stmt2->execute();
+            $wynik_raw = $stmt2->fetchColumn();
+
+            echo '<strong>' . (int)$wynik_raw . '</strong>';
+        } catch (PDOException $e) {
+            error_log('Błąd głosowania na komentarz: ' . $e->getMessage());
             http_response_code(500);
         }
         exit;
