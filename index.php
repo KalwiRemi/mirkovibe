@@ -21,7 +21,47 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'glosuj'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj'];
+
+function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = ''): string {
+    $html  = '<div id="komentarze-sekcja">';
+    $html .= '<section style="margin-top:2rem;">';
+    $html .= '<h2 style="margin-bottom:1rem;">Komentarze (' . count($komentarze) . ')</h2>';
+
+    if (empty($komentarze)) {
+        $html .= '<p>Brak komentarzy.</p>';
+    } else {
+        $html .= '<ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">';
+        foreach ($komentarze as $komentarz) {
+            $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
+            $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
+            $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
+            $html .= '<li style="background:#fff;border-radius:6px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
+            $html .= '<div style="font-size:0.85rem;color:#555;margin-bottom:0.4rem;">';
+            $html .= '<strong>' . $k_autor . '</strong> &nbsp;|&nbsp; ' . $k_data;
+            $html .= '</div>';
+            $html .= '<div>' . nl2br($k_tresc) . '</div>';
+            $html .= '</li>';
+        }
+        $html .= '</ul>';
+    }
+    $html .= '</section>';
+
+    if ($zalogowany) {
+        $akcja = htmlspecialchars('index.php?strona=dodaj_komentarz&id=' . $wpis_id, ENT_QUOTES, 'UTF-8');
+        $html .= '<form method="post" style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.75rem;"'
+               . ' hx-post="' . $akcja . '" hx-target="#komentarze-sekcja" hx-swap="outerHTML">';
+        if ($blad !== '') {
+            $html .= '<p style="color:red;">' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+        $html .= '<textarea name="tresc" placeholder="Dodaj komentarz..." rows="3" maxlength="2000" style="resize:vertical;" required></textarea>';
+        $html .= '<button type="submit" style="align-self:flex-start;">Wyślij komentarz</button>';
+        $html .= '</form>';
+    }
+
+    $html .= '</div>';
+    return $html;
+}
 $zadana_strona = isset($_GET['strona']) ? htmlspecialchars($_GET['strona'], ENT_QUOTES, 'UTF-8') : '';
 $strona = in_array($zadana_strona, $dozwolone_strony) ? $zadana_strona : 'glowna';
 
@@ -175,27 +215,7 @@ switch ($strona) {
             $komentarze = [];
         }
 
-        echo '<section style="margin-top:2rem;">';
-        echo '<h2 style="margin-bottom:1rem;">Komentarze (' . count($komentarze) . ')</h2>';
-
-        if (empty($komentarze)) {
-            echo '<p>Brak komentarzy.</p>';
-        } else {
-            echo '<ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">';
-            foreach ($komentarze as $komentarz) {
-                $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
-                $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
-                $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
-                echo '<li style="background:#fff;border-radius:6px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
-                echo '<div style="font-size:0.85rem;color:#555;margin-bottom:0.4rem;">';
-                echo '<strong>' . $k_autor . '</strong> &nbsp;|&nbsp; ' . $k_data;
-                echo '</div>';
-                echo '<div>' . nl2br($k_tresc) . '</div>';
-                echo '</li>';
-            }
-            echo '</ul>';
-        }
-        echo '</section>';
+        echo renderujKomentarze($komentarze, $wpis_id, isset($_SESSION['uzytkownik_id']));
         break;
     case 'dodaj':
         if (!isset($_SESSION['uzytkownik_id'])) {
@@ -368,6 +388,64 @@ switch ($strona) {
         echo '<button type="submit">Zarejestruj się</button>';
         echo '</form>';
         break;
+    case 'dodaj_komentarz':
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        if (!isset($_SESSION['uzytkownik_id'])) {
+            http_response_code(403);
+            echo '<p style="color:red;">Musisz być zalogowany, aby dodać komentarz.</p>';
+            exit;
+        }
+
+        $wpis_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if ($wpis_id <= 0) {
+            http_response_code(400);
+            echo '<p style="color:red;">Nieprawidłowy identyfikator wpisu.</p>';
+            exit;
+        }
+
+        $blad_komentarza   = '';
+        $tresc_komentarza  = trim($_POST['tresc'] ?? '');
+        if (!empty($tresc_komentarza)) {
+            if (strlen($tresc_komentarza) > 2000) {
+                $blad_komentarza = 'Komentarz nie może przekraczać 2000 znaków.';
+            } else {
+                try {
+                    $stmt = $polaczenie->prepare(
+                        'INSERT INTO komentarze (wpis_id, autor_id, tresc)
+                         VALUES (:wpis_id, :autor_id, :tresc)'
+                    );
+                    $stmt->execute([
+                        ':wpis_id'  => $wpis_id,
+                        ':autor_id' => $_SESSION['uzytkownik_id'],
+                        ':tresc'    => $tresc_komentarza,
+                    ]);
+                } catch (PDOException $e) {
+                    error_log('Błąd dodawania komentarza: ' . $e->getMessage());
+                    $blad_komentarza = 'Wystąpił błąd podczas dodawania komentarza. Spróbuj ponownie.';
+                }
+            }
+        }
+
+        try {
+            $stmt = $polaczenie->prepare(
+                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania
+                 FROM komentarze k
+                 JOIN uzytkownicy u ON u.id = k.autor_id
+                 WHERE k.wpis_id = :wpis_id
+                 ORDER BY k.data_dodania ASC'
+            );
+            $stmt->execute([':wpis_id' => $wpis_id]);
+            $komentarze = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania komentarzy: ' . $e->getMessage());
+            $komentarze = [];
+        }
+
+        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza);
+        exit;
     case 'glosuj':
         ob_end_clean();
         if (!isset($_SESSION['uzytkownik_id'])) {
