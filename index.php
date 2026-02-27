@@ -21,7 +21,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'glosuj'];
 $zadana_strona = isset($_GET['strona']) ? htmlspecialchars($_GET['strona'], ENT_QUOTES, 'UTF-8') : '';
 $strona = in_array($zadana_strona, $dozwolone_strony) ? $zadana_strona : 'glowna';
 
@@ -78,7 +78,12 @@ switch ($strona) {
                 echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" style="font-size:1.1rem;font-weight:bold;text-decoration:none;color:#1a1a2e;">' . $tytul . '</a>';
                 echo '<div style="margin-top:0.4rem;font-size:0.85rem;color:#555;">';
                 echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
-                echo 'Wynik: <strong>' . $wynik . '</strong> &nbsp;|&nbsp; ';
+                echo 'Wynik: <span id="wynik-wpisu-' . $id . '"><strong>' . $wynik . '</strong></span>';
+                if (isset($_SESSION['uzytkownik_id'])) {
+                    echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
+                    echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+                }
+                echo ' &nbsp;|&nbsp; ';
                 echo 'Komentarze: <strong>' . $komentarze . '</strong> &nbsp;|&nbsp; ';
                 echo $data;
                 echo '</div>';
@@ -145,7 +150,12 @@ switch ($strona) {
 
         echo '<p style="font-size:0.85rem;color:#555;">';
         echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
-        echo 'Wynik: <strong>' . $wynik . '</strong> &nbsp;|&nbsp; ';
+        echo 'Wynik: <span id="wynik-wpisu-' . $wpis_id . '"><strong>' . $wynik . '</strong></span>';
+        if (isset($_SESSION['uzytkownik_id'])) {
+            echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
+            echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+        }
+        echo ' &nbsp;|&nbsp; ';
         echo $data;
         echo '</p>';
         echo '</article>';
@@ -358,6 +368,44 @@ switch ($strona) {
         echo '<button type="submit">Zarejestruj się</button>';
         echo '</form>';
         break;
+    case 'glosuj':
+        ob_end_clean();
+        if (!isset($_SESSION['uzytkownik_id'])) {
+            http_response_code(403);
+            exit;
+        }
+
+        $wpis_id = isset($_POST['wpis_id']) ? (int)$_POST['wpis_id'] : 0;
+        $wartosc  = isset($_POST['wartosc'])  ? (int)$_POST['wartosc']  : 0;
+
+        if ($wpis_id <= 0 || !in_array($wartosc, [1, -1], true)) {
+            http_response_code(400);
+            exit;
+        }
+
+        try {
+            $stmt = $polaczenie->prepare('SELECT dodaj_glos(:uzytkownik_id, :wpis_id, CAST(:wartosc AS SMALLINT))');
+            $stmt->bindValue(':uzytkownik_id', $_SESSION['uzytkownik_id'], PDO::PARAM_INT);
+            $stmt->bindValue(':wpis_id',       $wpis_id,                   PDO::PARAM_INT);
+            $stmt->bindValue(':wartosc',       $wartosc,                   PDO::PARAM_INT);
+            $stmt->execute();
+
+            $stmt2 = $polaczenie->prepare('SELECT wynik FROM wpisy_z_wynikiem WHERE id = :id');
+            $stmt2->bindValue(':id', $wpis_id, PDO::PARAM_INT);
+            $stmt2->execute();
+            $wynik_raw = $stmt2->fetchColumn();
+
+            if ($wynik_raw === false) {
+                http_response_code(404);
+                exit;
+            }
+
+            echo '<strong>' . (int)$wynik_raw . '</strong>';
+        } catch (PDOException $e) {
+            error_log('Błąd głosowania: ' . $e->getMessage());
+            http_response_code(500);
+        }
+        exit;
     case 'wyloguj':
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
