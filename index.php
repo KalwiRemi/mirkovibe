@@ -560,88 +560,57 @@ $tresc = ob_get_clean();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mirkovibe</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org" defer></script>
     <style>
-        :root {
-            --bg:        #f7f5f0;
-            --surface:   #ffffff;
-            --primary:   #0d1b2a;
-            --accent:    #e8552a;
-            --accent-lt: #fff0ec;
-            --muted:     #6b7280;
-            --border:    #e2ddd6;
-            --radius:    4px;
-            --shadow:    0 1px 4px rgba(13,27,42,.08), 0 4px 16px rgba(13,27,42,.06);
-            --shadow-lg: 0 4px 24px rgba(13,27,42,.14);
-            --font-display: 'Syne', sans-serif;
-            --font-body:    'Libre Baskerville', Georgia, serif;
-            --transition:   180ms ease;
-        }
-
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: var(--font-body);
-            background: var(--bg);
-            color: var(--primary);
+            font-family: Verdana, Geneva, sans-serif;
+            background: #f6f6f6;
+            color: #000;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            font-size: 15px;
-            line-height: 1.65;
+            font-size: 13px;
+            line-height: 1.5;
         }
 
         /* ── Header ── */
         header {
-            background: var(--primary);
+            background: #000;
             color: #fff;
-            padding: 0 2rem;
+            padding: 4px 8px;
             display: flex;
             align-items: center;
-            gap: 2.5rem;
-            height: 56px;
-            border-bottom: 3px solid var(--accent);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            gap: 1rem;
         }
 
         header .nazwa-serwisu {
-            font-family: var(--font-display);
-            font-size: 1.5rem;
-            font-weight: 800;
+            font-size: 1rem;
+            font-weight: bold;
             text-decoration: none;
             color: #fff;
-            letter-spacing: -0.5px;
+            border: 1px solid #fff;
+            padding: 1px 4px;
         }
 
-        header .nazwa-serwisu span { color: var(--accent); }
-
-        nav { display: flex; align-items: center; gap: 0.25rem; }
+        nav { display: flex; align-items: center; gap: 0.1rem; }
 
         nav a {
-            color: rgba(255,255,255,.65);
+            color: #fff;
             text-decoration: none;
-            font-family: var(--font-display);
-            font-size: 0.82rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            padding: 0.35rem 0.75rem;
-            border-radius: var(--radius);
-            transition: color var(--transition), background var(--transition);
+            font-size: 0.85rem;
+            padding: 2px 6px;
         }
 
-        nav a:hover { color: #fff; background: rgba(255,255,255,.1); }
+        nav a:hover { text-decoration: underline; }
+
+        .nav-sep { color: #888; padding: 0 2px; }
 
         .nav-user {
-            color: rgba(255,255,255,.5);
-            font-size: 0.82rem;
-            font-family: var(--font-display);
-            padding: 0 0.5rem;
+            color: #ccc;
+            font-size: 0.85rem;
+            padding: 2px 4px;
         }
 
         /* ── Layout ── */
@@ -649,302 +618,236 @@ $tresc = ob_get_clean();
             flex: 1;
             max-width: 860px;
             width: 100%;
-            margin: 2.5rem auto;
-            padding: 0 1.25rem;
-            animation: fadeUp .35s ease both;
-        }
-
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
+            margin: 1rem auto;
+            padding: 0 8px;
         }
 
         /* ── Typography ── */
         h1 {
-            font-family: var(--font-display);
-            font-size: 1.9rem;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            margin-bottom: 1.5rem;
-            color: var(--primary);
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
         }
 
         h2 {
-            font-family: var(--font-display);
-            font-size: 1.1rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
+            font-size: 0.95rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
         }
 
-        /* ── Cards / List ── */
+        a { color: #000; }
+        a:visited { color: #444; }
+
+        /* ── Post List ── */
         .card-list {
             list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 0.85rem;
-            margin-top: 0.5rem;
+            border-top: 1px solid #ccc;
         }
 
         .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.1rem 1.25rem;
-            box-shadow: var(--shadow);
-            transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
-            position: relative;
+            border-bottom: 1px solid #e8e8e8;
+            padding: 6px 4px;
         }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; bottom: 0;
-            width: 3px;
-            background: transparent;
-            border-radius: var(--radius) 0 0 var(--radius);
-            transition: background var(--transition);
-        }
-
-        .card:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-2px);
-            border-color: #cdc8c0;
-        }
-
-        .card:hover::before { background: var(--accent); }
 
         .card-title {
-            font-family: var(--font-display);
-            font-size: 1.05rem;
-            font-weight: 700;
+            font-size: 0.95rem;
             text-decoration: none;
-            color: var(--primary);
-            letter-spacing: -0.2px;
-            transition: color var(--transition);
+            color: #000;
         }
 
-        .card-title:hover { color: var(--accent); }
+        .card-title:hover { text-decoration: underline; }
+        .card-title:visited { color: #444; }
 
         .card-meta {
-            margin-top: 0.45rem;
-            font-size: 0.8rem;
-            color: var(--muted);
+            margin-top: 2px;
+            font-size: 0.78rem;
+            color: #555;
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 0.4rem 0.6rem;
+            gap: 0 0.3rem;
         }
 
-        .card-meta strong { color: var(--primary); }
-
-        .card-meta .sep { color: var(--border); }
+        .card-meta strong { color: #000; font-weight: normal; }
+        .card-meta .sep { color: #ccc; }
 
         /* ── Score & Vote buttons ── */
-        .score { font-weight: 700; color: var(--primary); }
+        .score { font-weight: bold; }
 
         .btn-vote {
             cursor: pointer;
-            padding: 1px 7px;
-            border-radius: var(--radius);
-            font-size: 0.85rem;
-            font-weight: 700;
-            font-family: var(--font-display);
-            border: 1px solid var(--border);
-            background: var(--bg);
-            color: var(--muted);
-            transition: background var(--transition), color var(--transition), border-color var(--transition);
-            line-height: 1.6;
+            font-size: 0.78rem;
+            font-family: Verdana, Geneva, sans-serif;
+            border: none;
+            background: none;
+            color: #555;
+            padding: 0 2px;
         }
 
-        .btn-vote.up:hover   { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
-        .btn-vote.down:hover { background: #ffebee; border-color: #ef9a9a; color: #c62828; }
+        .btn-vote:hover { color: #000; text-decoration: underline; }
 
         /* ── Article (single post) ── */
         .article-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem 2.25rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 2rem;
+            border: 1px solid #ddd;
+            background: #fff;
+            padding: 1rem;
+            margin-bottom: 1rem;
         }
 
-        .article-card h1 { margin-bottom: 1rem; }
+        .article-card h1 { margin-bottom: 0.75rem; }
 
         .article-body {
-            margin-bottom: 1.25rem;
-            line-height: 1.75;
-            color: #2a2a2a;
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
         }
 
         .article-link {
             display: inline-block;
-            margin-bottom: 1.25rem;
-            color: var(--accent);
-            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            color: #000;
+            font-size: 0.85rem;
             word-break: break-all;
             text-decoration: underline;
-            text-underline-offset: 3px;
         }
 
         /* ── Comments ── */
-        .comments-section { margin-top: 2rem; }
+        .comments-section { margin-top: 1.5rem; }
 
         .comment-list {
             list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            margin-top: 0.75rem;
+            border-top: 1px solid #ccc;
+            margin-top: 0.5rem;
         }
 
         .comment-item {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 0.9rem 1.1rem;
-            box-shadow: var(--shadow);
+            border-bottom: 1px solid #e8e8e8;
+            padding: 8px 4px;
         }
 
         .comment-meta {
-            font-size: 0.8rem;
-            color: var(--muted);
-            margin-bottom: 0.4rem;
+            font-size: 0.78rem;
+            color: #555;
+            margin-bottom: 4px;
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 0.3rem 0.5rem;
+            gap: 0 0.3rem;
         }
 
-        .comment-meta strong { color: var(--primary); }
+        .comment-meta strong { color: #000; font-weight: bold; }
 
         /* ── Forms ── */
         .form-stack {
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
-            max-width: 560px;
+            gap: 0.5rem;
+            max-width: 500px;
         }
 
         .form-stack input,
         .form-stack textarea {
-            font-family: var(--font-body);
+            font-family: Verdana, Geneva, sans-serif;
             font-size: 0.9rem;
-            padding: 0.6rem 0.85rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--surface);
-            color: var(--primary);
-            transition: border-color var(--transition), box-shadow var(--transition);
-            outline: none;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            background: #fff;
+            color: #000;
             width: 100%;
         }
 
         .form-stack input:focus,
         .form-stack textarea:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(232,85,42,.12);
+            outline: 2px solid #000;
         }
 
         .btn-primary {
-            font-family: var(--font-display);
-            font-size: 0.88rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            padding: 0.6rem 1.4rem;
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            border-radius: var(--radius);
+            font-family: Verdana, Geneva, sans-serif;
+            font-size: 0.85rem;
+            padding: 4px 12px;
+            background: #fff;
+            color: #000;
+            border: 1px solid #000;
             cursor: pointer;
             align-self: flex-start;
-            transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
         }
 
-        .btn-primary:hover {
-            background: #c9441a;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(232,85,42,.35);
-        }
+        .btn-primary:hover { background: #000; color: #fff; }
 
         .form-stack textarea { resize: vertical; }
-        .form-stack--comment { margin-top: 1.25rem; }
+        .form-stack--comment { margin-top: 1rem; }
 
         /* ── Empty state ── */
-        .empty-state { margin-top: 0.75rem; color: var(--muted); }
+        .empty-state { margin-top: 0.5rem; color: #555; }
+
         .error-list {
             list-style: none;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             display: flex;
             flex-direction: column;
-            gap: 0.3rem;
+            gap: 0.25rem;
         }
 
         .error-list li {
-            background: #fff3f1;
-            border: 1px solid #f5c6bc;
-            border-radius: var(--radius);
-            padding: 0.45rem 0.85rem;
-            font-size: 0.88rem;
-            color: #b33016;
+            border: 1px solid #999;
+            padding: 4px 8px;
+            font-size: 0.85rem;
         }
 
         /* ── Pagination ── */
         .pagination {
-            margin-top: 1.75rem;
+            margin-top: 1rem;
             display: flex;
-            gap: 0.35rem;
+            gap: 0.2rem;
             align-items: center;
         }
 
         .pagination a {
-            font-family: var(--font-display);
             font-size: 0.85rem;
-            font-weight: 700;
-            padding: 0.3rem 0.7rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
+            padding: 2px 6px;
+            border: 1px solid #ccc;
             text-decoration: none;
-            color: var(--muted);
-            transition: background var(--transition), border-color var(--transition), color var(--transition);
+            color: #000;
         }
 
         .pagination a:hover,
         .pagination a.active {
-            background: var(--primary);
-            border-color: var(--primary);
+            background: #000;
+            border-color: #000;
             color: #fff;
         }
 
         /* ── Footer ── */
         footer {
-            background: var(--primary);
-            color: rgba(255,255,255,.4);
+            background: #000;
+            color: #888;
             text-align: center;
-            padding: 1rem 1.5rem;
-            font-size: 0.8rem;
-            font-family: var(--font-display);
-            letter-spacing: 0.04em;
+            padding: 6px;
+            font-size: 0.78rem;
+            margin-top: 2rem;
         }
 
         /* ── Auth pages ── */
-        .auth-wrap { max-width: 400px; }
-        .auth-hint { margin-top: 1rem; font-size: 0.88rem; color: var(--muted); }
-        .auth-hint a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+        .auth-wrap { max-width: 360px; }
+        .auth-hint { margin-top: 0.75rem; font-size: 0.85rem; color: #555; }
+        .auth-hint a { color: #000; text-decoration: underline; }
     </style>
 </head>
 <body>
     <header>
-        <a class="nazwa-serwisu" href="index.php">Mirko<span>vibe</span></a>
+        <a class="nazwa-serwisu" href="index.php">Mirkovibe</a>
         <nav>
             <a href="index.php?strona=glowna">Główna</a>
+            <span class="nav-sep">|</span>
             <a href="index.php?strona=dodaj">Dodaj wpis</a>
             <?php if (isset($_SESSION['uzytkownik_id'])): ?>
+                <span class="nav-sep">|</span>
                 <span class="nav-user">Witaj, <?= htmlspecialchars($_SESSION['uzytkownik_nazwa'], ENT_QUOTES, 'UTF-8') ?>!</span>
+                <span class="nav-sep">|</span>
                 <a href="index.php?strona=wyloguj">Wyloguj</a>
             <?php else: ?>
+                <span class="nav-sep">|</span>
                 <a href="index.php?strona=logowanie">Logowanie</a>
+                <span class="nav-sep">|</span>
                 <a href="index.php?strona=rejestracja">Rejestracja</a>
             <?php endif; ?>
         </nav>
