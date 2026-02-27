@@ -96,12 +96,12 @@ switch ($strona) {
             $liczba_wpisow = (int)$stmt_licznik->fetchColumn();
 
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, u.nazwa AS autor, w.wynik, w.data_dodania,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
-                 GROUP BY w.id, w.tytul, u.nazwa, w.wynik, w.data_dodania
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania
                  ORDER BY w.data_dodania DESC
                  LIMIT :limit OFFSET :offset'
             );
@@ -124,17 +124,34 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
-                $autor = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
-                $wynik = (int)$wpis['wynik'];
+                $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
+                $autor      = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
+                $wynik      = (int)$wpis['wynik'];
                 $komentarze = (int)$wpis['liczba_komentarzy'];
-                $data = htmlspecialchars(
+                $data       = htmlspecialchars(
                     date('d.m.Y H:i', strtotime($wpis['data_dodania'])),
                     ENT_QUOTES, 'UTF-8'
                 );
                 $id = (int)$wpis['id'];
                 echo '<li class="card">';
-                echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                if ($rodzaj === 'link') {
+                    $tytul     = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+                    echo '<span class="type-badge type-badge--link">L</span> ';
+                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                    if (!empty($wpis['link'])) {
+                        $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
+                        if (in_array($link_schema, ['http', 'https'], true)) {
+                            $link_host = parse_url($wpis['link'], PHP_URL_HOST) ?? '';
+                            $link_url  = htmlspecialchars($wpis['link'], ENT_QUOTES, 'UTF-8');
+                            if ($link_host !== '') {
+                                echo ' <a href="' . $link_url . '" class="card-domain" rel="noopener noreferrer" target="_blank">(' . htmlspecialchars($link_host, ENT_QUOTES, 'UTF-8') . ')</a>';
+                            }
+                        }
+                    }
+                } else {
+                    $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
+                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $podglad . '</a>';
+                }
                 echo '<div class="card-meta">';
                 echo 'Autor: <strong>' . $autor . '</strong>';
                 echo '<span class="sep">|</span>';
@@ -172,7 +189,7 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, u.nazwa AS autor, w.wynik, w.data_dodania
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  WHERE w.id = :id'
@@ -189,23 +206,30 @@ switch ($strona) {
             break;
         }
 
-        $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+        $rodzaj_wpisu = $wpis['rodzaj'] ?? 'wpis';
         $autor = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
         $wynik = (int)$wpis['wynik'];
         $data  = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
 
         echo '<article class="article-card">';
-        echo '<h1>' . $tytul . '</h1>';
 
-        if (!empty($wpis['tresc'])) {
-            echo '<div class="article-body">' . nl2br(parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8'))) . '</div>';
-        }
-        if (!empty($wpis['link'])) {
-            $link_raw = $wpis['link'];
-            $link_schema = strtolower(parse_url($link_raw, PHP_URL_SCHEME));
-            if (in_array($link_schema, ['http', 'https'], true)) {
-                $link = htmlspecialchars($link_raw, ENT_QUOTES, 'UTF-8');
-                echo '<a href="' . $link . '" class="article-link" rel="noopener noreferrer" target="_blank">' . $link . '</a>';
+        if ($rodzaj_wpisu === 'link') {
+            $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+            echo '<h1><span class="type-badge type-badge--link">L</span> ' . $tytul . '</h1>';
+            if (!empty($wpis['link'])) {
+                $link_raw    = $wpis['link'];
+                $link_schema = strtolower(parse_url($link_raw, PHP_URL_SCHEME) ?: '');
+                if (in_array($link_schema, ['http', 'https'], true)) {
+                    $link = htmlspecialchars($link_raw, ENT_QUOTES, 'UTF-8');
+                    echo '<a href="' . $link . '" class="article-link" rel="noopener noreferrer" target="_blank">' . $link . '</a>';
+                }
+            }
+            if (!empty($wpis['tresc'])) {
+                echo '<div class="article-body article-tags">' . parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
+            }
+        } else {
+            if (!empty($wpis['tresc'])) {
+                echo '<div class="article-body">' . nl2br(parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8'))) . '</div>';
             }
         }
 
@@ -249,33 +273,62 @@ switch ($strona) {
         }
 
         $bledy = [];
-        $tytul_wpisany = '';
-        $tresc_wpisana = '';
-        $link_wpisany  = '';
+        $rodzaj_wpisany = 'wpis';
+        $tytul_wpisany  = '';
+        $tresc_wpisana  = '';
+        $link_wpisany   = '';
+        $tagi_wpisane   = '';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $tytul_wpisany = trim($_POST['tytul'] ?? '');
-            $tresc_wpisana = trim($_POST['tresc'] ?? '');
-            $link_wpisany  = trim($_POST['link']  ?? '');
+            $rodzaj_wpisany = in_array($_POST['rodzaj'] ?? '', ['wpis', 'link'], true) ? $_POST['rodzaj'] : 'wpis';
+            $tytul_wpisany  = trim($_POST['tytul'] ?? '');
+            $tresc_wpisana  = trim($_POST['tresc'] ?? '');
+            $link_wpisany   = trim($_POST['link']  ?? '');
+            $tagi_wpisane   = trim($_POST['tagi']  ?? '');
 
-            if ($tytul_wpisany === '') {
-                $bledy[] = 'Tytuł jest wymagany.';
-            }
-            if ($tresc_wpisana === '' && $link_wpisany === '') {
-                $bledy[] = 'Podaj treść lub link.';
+            if ($rodzaj_wpisany === 'wpis') {
+                if ($tresc_wpisana === '') {
+                    $bledy[] = 'Treść jest wymagana.';
+                }
+            } else {
+                if ($tytul_wpisany === '') {
+                    $bledy[] = 'Tytuł jest wymagany.';
+                }
+                if ($link_wpisany === '') {
+                    $bledy[] = 'URL jest wymagany.';
+                } elseif (!in_array(strtolower(parse_url($link_wpisany, PHP_URL_SCHEME) ?: ''), ['http', 'https'], true)) {
+                    $bledy[] = 'URL musi być adresem HTTP lub HTTPS.';
+                }
+                if ($tagi_wpisane === '') {
+                    $bledy[] = 'Tagi są wymagane.';
+                }
             }
 
             if (empty($bledy)) {
+                if ($rodzaj_wpisany === 'link') {
+                    $fragmenty = preg_split('/[\s,]+/', $tagi_wpisane, -1, PREG_SPLIT_NO_EMPTY);
+                    $tresc_do_zapisu = implode(' ', array_map(function ($t) {
+                        return '#' . ltrim($t, '#');
+                    }, $fragmenty));
+                    $tytul_do_zapisu = $tytul_wpisany;
+                    $link_do_zapisu  = $link_wpisany;
+                } else {
+                    $tresc_do_zapisu = $tresc_wpisana;
+                    $tytul_do_zapisu = null;
+                    $link_do_zapisu  = null;
+                }
+
                 try {
                     $stmt = $polaczenie->prepare(
-                        'INSERT INTO wpisy (tytul, tresc, link, autor_id)
-                         VALUES (:tytul, :tresc, :link, :autor_id)
+                        'INSERT INTO wpisy (tytul, tresc, link, rodzaj, autor_id)
+                         VALUES (:tytul, :tresc, :link, :rodzaj, :autor_id)
                          RETURNING id'
                     );
                     $stmt->execute([
-                        ':tytul'    => $tytul_wpisany,
-                        ':tresc'    => $tresc_wpisana ?: null,
-                        ':link'     => $link_wpisany  ?: null,
+                        ':tytul'    => $tytul_do_zapisu,
+                        ':tresc'    => $tresc_do_zapisu ?: null,
+                        ':link'     => $link_do_zapisu,
+                        ':rodzaj'   => $rodzaj_wpisany,
                         ':autor_id' => $_SESSION['uzytkownik_id'],
                     ]);
                     $nowy_id = (int)$stmt->fetchColumn();
@@ -288,6 +341,11 @@ switch ($strona) {
             }
         }
 
+        $safe_tytul = htmlspecialchars($tytul_wpisany, ENT_QUOTES, 'UTF-8');
+        $safe_tresc = htmlspecialchars($tresc_wpisana, ENT_QUOTES, 'UTF-8');
+        $safe_link  = htmlspecialchars($link_wpisany,  ENT_QUOTES, 'UTF-8');
+        $safe_tagi  = htmlspecialchars($tagi_wpisane,  ENT_QUOTES, 'UTF-8');
+
         echo '<h1>Dodaj wpis</h1>';
         if (!empty($bledy)) {
             echo '<ul class="error-list">';
@@ -296,12 +354,31 @@ switch ($strona) {
             }
             echo '</ul>';
         }
+        echo '<div class="type-toggle">';
+        echo '<button type="button" class="type-btn' . ($rodzaj_wpisany === 'wpis' ? ' active' : '') . '" data-type="wpis" onclick="switchType(\'wpis\')">Wpis</button>';
+        echo '<button type="button" class="type-btn' . ($rodzaj_wpisany === 'link' ? ' active' : '') . '" data-type="link" onclick="switchType(\'link\')">Link</button>';
+        echo '</div>';
         echo '<form method="post" class="form-stack">';
-        echo '<input type="text" name="tytul" placeholder="Tytuł" value="' . htmlspecialchars($tytul_wpisany, ENT_QUOTES, 'UTF-8') . '" required>';
-        echo '<textarea name="tresc" placeholder="Treść (opcjonalnie)" rows="5">' . htmlspecialchars($tresc_wpisana, ENT_QUOTES, 'UTF-8') . '</textarea>';
-        echo '<input type="url" name="link" placeholder="Link (opcjonalnie)" value="' . htmlspecialchars($link_wpisany, ENT_QUOTES, 'UTF-8') . '">';
+        echo '<input type="hidden" name="rodzaj" id="rodzaj-input" value="' . htmlspecialchars($rodzaj_wpisany, ENT_QUOTES, 'UTF-8') . '">';
+        echo '<div id="sekcja-wpis"' . ($rodzaj_wpisany === 'link' ? ' style="display:none"' : '') . '>';
+        echo '<textarea name="tresc" placeholder="Treść wpisu..." rows="5">' . $safe_tresc . '</textarea>';
+        echo '</div>';
+        echo '<div id="sekcja-link"' . ($rodzaj_wpisany === 'wpis' ? ' style="display:none"' : '') . '>';
+        echo '<input type="text" name="tytul" placeholder="Tytuł" value="' . $safe_tytul . '">';
+        echo '<input type="url" name="link" placeholder="URL (https://...)" value="' . $safe_link . '">';
+        echo '<input type="text" name="tagi" placeholder="Tagi (np. #technologia #muzyka)" value="' . $safe_tagi . '">';
+        echo '</div>';
         echo '<button type="submit" class="btn-primary">Dodaj wpis</button>';
         echo '</form>';
+        echo '<script>';
+        echo 'function switchType(type){';
+        echo 'document.getElementById("rodzaj-input").value=type;';
+        echo 'document.getElementById("sekcja-wpis").style.display=type==="wpis"?"":"none";';
+        echo 'document.getElementById("sekcja-link").style.display=type==="link"?"":"none";';
+        echo 'document.querySelectorAll(".type-btn").forEach(function(b){b.classList.remove("active");});';
+        echo 'document.querySelector(".type-btn[data-type=\""+type+"\"]").classList.add("active");';
+        echo '}';
+        echo '</script>';
         break;
     case 'logowanie':
         if (isset($_SESSION['uzytkownik_id'])) {
@@ -562,13 +639,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, u.nazwa AS autor, w.wynik, w.data_dodania,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
                  WHERE w.tresc ~* :pattern
-                 GROUP BY w.id, w.tytul, u.nazwa, w.wynik, w.data_dodania
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania
                  ORDER BY w.data_dodania DESC'
             );
             $stmt->execute([':pattern' => '(^|[^[:alnum:]_#])#' . $tag_nazwa . '([^[:alnum:]_]|$)']);
@@ -585,17 +662,34 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
-                $autor = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
-                $wynik = (int)$wpis['wynik'];
+                $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
+                $autor      = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
+                $wynik      = (int)$wpis['wynik'];
                 $komentarze = (int)$wpis['liczba_komentarzy'];
-                $data = htmlspecialchars(
+                $data       = htmlspecialchars(
                     date('d.m.Y H:i', strtotime($wpis['data_dodania'])),
                     ENT_QUOTES, 'UTF-8'
                 );
                 $id = (int)$wpis['id'];
                 echo '<li class="card">';
-                echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                if ($rodzaj === 'link') {
+                    $tytul     = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+                    echo '<span class="type-badge type-badge--link">L</span> ';
+                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                    if (!empty($wpis['link'])) {
+                        $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
+                        if (in_array($link_schema, ['http', 'https'], true)) {
+                            $link_host = parse_url($wpis['link'], PHP_URL_HOST) ?? '';
+                            $link_url  = htmlspecialchars($wpis['link'], ENT_QUOTES, 'UTF-8');
+                            if ($link_host !== '') {
+                                echo ' <a href="' . $link_url . '" class="card-domain" rel="noopener noreferrer" target="_blank">(' . htmlspecialchars($link_host, ENT_QUOTES, 'UTF-8') . ')</a>';
+                            }
+                        }
+                    }
+                } else {
+                    $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
+                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $podglad . '</a>';
+                }
                 echo '<div class="card-meta">';
                 echo 'Autor: <strong>' . $autor . '</strong>';
                 echo '<span class="sep">|</span>';
@@ -913,6 +1007,51 @@ $tresc = ob_get_clean();
         .tag-link { color: #000; text-decoration: none; font-weight: bold; }
         .tag-link:hover { text-decoration: underline; }
         .tag-link:visited { color: #444; }
+
+        /* ── Type toggle (add post page) ── */
+        .type-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0.75rem;
+            border: 1px solid #000;
+            width: fit-content;
+        }
+
+        .type-btn {
+            font-family: Verdana, Geneva, sans-serif;
+            font-size: 0.85rem;
+            padding: 4px 16px;
+            background: #fff;
+            color: #000;
+            border: none;
+            cursor: pointer;
+        }
+
+        .type-btn + .type-btn { border-left: 1px solid #000; }
+        .type-btn.active { background: #000; color: #fff; }
+        .type-btn:hover:not(.active) { background: #f0f0f0; }
+
+        /* ── Type badge (post list) ── */
+        .type-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: bold;
+            padding: 0 3px;
+            border: 1px solid;
+            vertical-align: middle;
+        }
+
+        .type-badge--link { border-color: #555; color: #555; }
+
+        .card-domain {
+            font-size: 0.78rem;
+            color: #555;
+            text-decoration: none;
+        }
+
+        .card-domain:hover { text-decoration: underline; }
+
+        .article-tags { margin-top: 0.5rem; }
     </style>
 </head>
 <body>

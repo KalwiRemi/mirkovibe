@@ -46,3 +46,20 @@ BEGIN
     END IF;
 END;
 $$;
+
+-- Migracja: dwa rodzaje wpisów (wpis i link)
+ALTER TABLE wpisy ADD COLUMN IF NOT EXISTS rodzaj TEXT NOT NULL DEFAULT 'wpis';
+
+CREATE OR REPLACE VIEW wpisy_z_wynikiem AS
+SELECT
+    w.id,
+    w.tytul,
+    w.tresc,
+    w.link,
+    w.autor_id,
+    w.data_dodania,
+    COALESCE(SUM(g.wartosc), 0) AS wynik,
+    w.rodzaj
+FROM wpisy w
+LEFT JOIN glosy g ON g.wpis_id = w.id
+GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj;

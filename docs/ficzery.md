@@ -35,7 +35,8 @@ Zalogowany użytkownik może się wylogować. Sesja jest w pełni niszczona po s
 ## 4. Lista wpisów (strona główna)
 
 Strona główna wyświetla listę wszystkich wpisów posortowanych od najnowszych. Każdy wpis na liście pokazuje:
-- Tytuł (link do strony wpisu)
+- Dla **wpisu**: fragment treści (do 120 znaków) jako link do strony wpisu
+- Dla **linku**: oznaczenie `L`, tytuł jako link do strony wpisu oraz domenę zewnętrznego URL
 - Autora
 - Aktualny wynik głosowania
 - Przyciski do głosowania (tylko dla zalogowanych użytkowników)
@@ -50,12 +51,17 @@ Wpisy są stronicowane – na jednej stronie wyświetla się **10 wpisów**. Naw
 
 ## 5. Dodawanie wpisu
 
-Zalogowany użytkownik może dodać nowy wpis podając:
-- **Tytuł** – wymagany.
-- **Treść** – opcjonalna.
-- **Link** – opcjonalny (musi być poprawnym adresem HTTP lub HTTPS).
+Zalogowany użytkownik może dodać jeden z dwóch rodzajów wpisów. Na stronie dostępny jest przełącznik między trybami:
 
-Wymagane jest podanie przynajmniej treści lub linku.
+### Wpis
+Zwykły wpis tekstowy. Wymagane:
+- **Treść** – wymagana (bez tytułu i URL).
+
+### Link
+Link do zewnętrznej strony. Wymagane:
+- **Tytuł** – wymagany.
+- **URL** – wymagany (musi być adresem HTTP lub HTTPS).
+- **Tagi** – wymagane (np. `#technologia #muzyka`); przechowywane jako hashtagi.
 
 **URL:** `index.php?strona=dodaj`
 
@@ -63,13 +69,20 @@ Wymagane jest podanie przynajmniej treści lub linku.
 
 ## 6. Strona wpisu
 
-Każdy wpis ma własną stronę wyświetlającą:
-- Tytuł wpisu
-- Treść wpisu (jeśli podana)
-- Link zewnętrzny (jeśli podany, otwierany w nowej karcie)
+Każdy wpis ma własną stronę. Wyświetlana zawartość zależy od rodzaju wpisu:
+
+**Wpis:**
+- Treść wpisu
+
+**Link:**
+- Tytuł wpisu (z oznaczeniem `L`)
+- Klikalny URL zewnętrzny (otwierany w nowej karcie)
+- Tagi powiązane z linkiem
+
+Wspólne dla obu rodzajów:
 - Metadane: autor, wynik głosowania, data dodania
 - Przyciski do głosowania (tylko dla zalogowanych użytkowników)
-- Sekcję komentarzy
+- Sekcja komentarzy
 
 **URL:** `index.php?strona=wpis&id={id}`
 
