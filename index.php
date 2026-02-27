@@ -38,7 +38,57 @@ switch ($strona) {
         echo '<h1>Logowanie</h1>';
         break;
     case 'rejestracja':
+        $bledy = [];
+        $nazwa_wpisana = '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $nazwa_wpisana = trim($_POST['nazwa'] ?? '');
+            $haslo         = $_POST['haslo']  ?? '';
+            $haslo2        = $_POST['haslo2'] ?? '';
+
+            if (strlen($nazwa_wpisana) < 3) {
+                $bledy[] = 'Nazwa użytkownika musi mieć co najmniej 3 znaki.';
+            }
+            if (strlen($haslo) < 6) {
+                $bledy[] = 'Hasło musi mieć co najmniej 6 znaków.';
+            }
+            if ($haslo !== $haslo2) {
+                $bledy[] = 'Hasła nie są zgodne.';
+            }
+
+            if (empty($bledy)) {
+                try {
+                    // Hashing is handled inside the SQL function via pgcrypto crypt()
+                    $stmt = $polaczenie->prepare('SELECT zarejestruj_uzytkownika(:nazwa, :haslo)');
+                    $stmt->execute([':nazwa' => $nazwa_wpisana, ':haslo' => $haslo]);
+                    header('Location: index.php?strona=logowanie');
+                    exit;
+                } catch (PDOException $e) {
+                    // The SQL function re-raises unique_violation as P0001 via RAISE EXCEPTION
+                    if ($e->getCode() === '23505' || $e->getCode() === 'P0001') {
+                        $bledy[] = 'Użytkownik o podanej nazwie już istnieje.';
+                    } else {
+                        error_log('Błąd rejestracji: ' . $e->getMessage());
+                        $bledy[] = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.';
+                    }
+                }
+            }
+        }
+
         echo '<h1>Rejestracja</h1>';
+        if (!empty($bledy)) {
+            echo '<ul style="color:red;margin-bottom:1rem;">';
+            foreach ($bledy as $blad) {
+                echo '<li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li>';
+            }
+            echo '</ul>';
+        }
+        echo '<form method="post" style="display:flex;flex-direction:column;gap:0.75rem;max-width:360px;">';
+        echo '<input type="text" name="nazwa" placeholder="Nazwa użytkownika" value="' . htmlspecialchars($nazwa_wpisana, ENT_QUOTES, 'UTF-8') . '" required>';
+        echo '<input type="password" name="haslo" placeholder="Hasło (min. 6 znaków)" required>';
+        echo '<input type="password" name="haslo2" placeholder="Powtórz hasło" required>';
+        echo '<button type="submit">Zarejestruj się</button>';
+        echo '</form>';
         break;
     case 'wyloguj':
         echo '<h1>Wylogowano</h1>';
