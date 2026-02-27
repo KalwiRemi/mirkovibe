@@ -12,6 +12,7 @@ CREATE TABLE wpisy (
     tytul        TEXT,
     tresc        TEXT,
     link         TEXT,
+    rodzaj       TEXT NOT NULL DEFAULT 'wpis',
     autor_id     INT REFERENCES uzytkownicy(id),
     data_dodania TIMESTAMPTZ DEFAULT NOW(),
     wynik        INT DEFAULT 0
@@ -44,10 +45,11 @@ SELECT
     w.link,
     w.autor_id,
     w.data_dodania,
-    COALESCE(SUM(g.wartosc), 0) AS wynik
+    COALESCE(SUM(g.wartosc), 0) AS wynik,
+    w.rodzaj
 FROM wpisy w
 LEFT JOIN glosy g ON g.wpis_id = w.id
-GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania;
+GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj;
 
 CREATE FUNCTION dodaj_glos(p_uzytkownik_id INT, p_wpis_id INT, p_wartosc SMALLINT)
 RETURNS VOID AS $$
