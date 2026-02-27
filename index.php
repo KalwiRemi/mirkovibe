@@ -2,10 +2,11 @@
 
 session_start();
 
-define('BAZA_HOST',       getenv('BAZA_HOST')       ?: 'localhost');
-define('BAZA_NAZWA',      getenv('BAZA_NAZWA')      ?: 'mirkovibe');
-define('BAZA_UZYTKOWNIK', getenv('BAZA_UZYTKOWNIK') ?: 'postgres');
-define('BAZA_HASLO',      getenv('BAZA_HASLO')      ?: '');
+define('BAZA_HOST',            getenv('BAZA_HOST')            ?: 'localhost');
+define('BAZA_NAZWA',           getenv('BAZA_NAZWA')           ?: 'mirkovibe');
+define('BAZA_UZYTKOWNIK',      getenv('BAZA_UZYTKOWNIK')      ?: 'postgres');
+define('BAZA_HASLO',           getenv('BAZA_HASLO')           ?: '');
+define('NAZWA_ADMINISTRATORA', getenv('NAZWA_ADMINISTRATORA') ?: '');
 
 try {
     $polaczenie = new PDO(
@@ -21,7 +22,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin'];
 
 function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = ''): string {
     $html  = '<div id="komentarze-sekcja">';
@@ -123,6 +124,9 @@ if (!isset($_GET['strona'])) {
             if ($seg1 !== null && preg_match('/^[\p{L}\p{N}_]+$/u', $seg1)) {
                 $_GET['tag'] = $seg1;
             }
+            break;
+        case 'admin':
+            $_GET['strona'] = 'admin';
             break;
         default:
             $_GET['strona'] = 'glowna';
@@ -454,14 +458,15 @@ switch ($strona) {
 
             if (empty($bledy)) {
                 try {
-                    $stmt = $polaczenie->prepare('SELECT id, nazwa, haslo_hash FROM uzytkownicy WHERE nazwa = :nazwa');
+                    $stmt = $polaczenie->prepare('SELECT id, nazwa, haslo_hash, jest_adminem FROM uzytkownicy WHERE nazwa = :nazwa');
                     $stmt->execute([':nazwa' => $nazwa_wpisana]);
                     $uzytkownik = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     if ($uzytkownik && password_verify($haslo, $uzytkownik['haslo_hash'])) {
                         session_regenerate_id(true);
-                        $_SESSION['uzytkownik_id']   = $uzytkownik['id'];
+                        $_SESSION['uzytkownik_id']    = $uzytkownik['id'];
                         $_SESSION['uzytkownik_nazwa'] = $uzytkownik['nazwa'];
+                        $_SESSION['jest_adminem']     = (bool)$uzytkownik['jest_adminem'];
                         header('Location: /');
                         exit;
                     } else {
@@ -494,6 +499,27 @@ switch ($strona) {
         $bledy = [];
         $nazwa_wpisana = '';
 
+        $rejestracja_wlaczona = false;
+        try {
+            $stmt_cfg = $polaczenie->prepare("SELECT wartosc FROM konfiguracja WHERE klucz = 'rejestracja_wlaczona'");
+            $stmt_cfg->execute();
+            $cfg_wartosc = $stmt_cfg->fetchColumn();
+            $rejestracja_wlaczona = ($cfg_wartosc === 'true');
+        } catch (PDOException $e) {
+            error_log('Błąd odczytu konfiguracji: ' . $e->getMessage());
+        }
+
+        if (!$rejestracja_wlaczona) {
+            $nazwa_wpisana = trim($_POST['nazwa'] ?? '');
+            $jest_nazwa_admina = NAZWA_ADMINISTRATORA !== '' && $nazwa_wpisana === NAZWA_ADMINISTRATORA;
+
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$jest_nazwa_admina) {
+                echo '<h1>Rejestracja</h1>';
+                echo '<p>Rejestracja wyłączona.</p>';
+                break;
+            }
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nazwa_wpisana = trim($_POST['nazwa'] ?? '');
             $haslo         = $_POST['haslo']  ?? '';
@@ -514,6 +540,10 @@ switch ($strona) {
                     // Hashing is handled inside the SQL function via pgcrypto crypt()
                     $stmt = $polaczenie->prepare('SELECT zarejestruj_uzytkownika(:nazwa, :haslo)');
                     $stmt->execute([':nazwa' => $nazwa_wpisana, ':haslo' => $haslo]);
+                    if (NAZWA_ADMINISTRATORA !== '' && $nazwa_wpisana === NAZWA_ADMINISTRATORA) {
+                        $stmt_admin = $polaczenie->prepare('UPDATE uzytkownicy SET jest_adminem = TRUE WHERE nazwa = :nazwa');
+                        $stmt_admin->execute([':nazwa' => $nazwa_wpisana]);
+                    }
                     header('Location: /logowanie');
                     exit;
                 } catch (PDOException $e) {
@@ -759,6 +789,52 @@ switch ($strona) {
             }
             echo '</ul>';
         }
+        break;
+    case 'admin':
+        if (!isset($_SESSION['uzytkownik_id']) || empty($_SESSION['jest_adminem'])) {
+            http_response_code(403);
+            echo '<h1>Panel administratora</h1>';
+            echo '<p>Brak dostępu.</p>';
+            break;
+        }
+
+        $komunikat_admina = '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $nowa_wartosc = (isset($_POST['rejestracja_wlaczona']) && $_POST['rejestracja_wlaczona'] === '1') ? 'true' : 'false';
+            try {
+                $stmt_upd = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'rejestracja_wlaczona'");
+                $stmt_upd->execute([':wartosc' => $nowa_wartosc]);
+                $komunikat_admina = 'Konfiguracja została zapisana.';
+            } catch (PDOException $e) {
+                error_log('Błąd zapisu konfiguracji: ' . $e->getMessage());
+                $komunikat_admina = 'Wystąpił błąd podczas zapisu konfiguracji.';
+            }
+        }
+
+        $rejestracja_wlaczona_cfg = false;
+        try {
+            $stmt_cfg2 = $polaczenie->prepare("SELECT wartosc FROM konfiguracja WHERE klucz = 'rejestracja_wlaczona'");
+            $stmt_cfg2->execute();
+            $rejestracja_wlaczona_cfg = ($stmt_cfg2->fetchColumn() === 'true');
+        } catch (PDOException $e) {
+            error_log('Błąd odczytu konfiguracji: ' . $e->getMessage());
+        }
+
+        echo '<h1>Panel administratora</h1>';
+        if ($komunikat_admina !== '') {
+            echo '<p class="admin-msg">' . htmlspecialchars($komunikat_admina, ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+        echo '<section class="admin-section">';
+        echo '<h2>Ustawienia rejestracji</h2>';
+        echo '<form method="post" class="form-stack">';
+        echo '<label class="admin-label">';
+        echo '<input type="checkbox" name="rejestracja_wlaczona" value="1"' . ($rejestracja_wlaczona_cfg ? ' checked' : '') . '>';
+        echo ' Rejestracja włączona';
+        echo '</label>';
+        echo '<button type="submit" class="btn-primary">Zapisz</button>';
+        echo '</form>';
+        echo '</section>';
         break;
     case 'wyloguj':
         $_SESSION = [];
@@ -1104,6 +1180,11 @@ $tresc = ob_get_clean();
         .card-domain:hover { text-decoration: underline; }
 
         .article-tags { margin-top: 0.5rem; }
+
+        /* ── Admin panel ── */
+        .admin-section { margin-top: 1rem; }
+        .admin-msg { margin-bottom: 0.75rem; border: 1px solid #999; padding: 4px 8px; font-size: 0.85rem; }
+        .admin-label { font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; }
     </style>
 </head>
 <body>
@@ -1117,6 +1198,10 @@ $tresc = ob_get_clean();
                 <span class="nav-sep">|</span>
                 <span class="nav-user">Witaj, <?= htmlspecialchars($_SESSION['uzytkownik_nazwa'], ENT_QUOTES, 'UTF-8') ?>!</span>
                 <span class="nav-sep">|</span>
+                <?php if (!empty($_SESSION['jest_adminem'])): ?>
+                    <a href="/admin">Admin</a>
+                    <span class="nav-sep">|</span>
+                <?php endif; ?>
                 <a href="/wyloguj">Wyloguj</a>
             <?php else: ?>
                 <span class="nav-sep">|</span>

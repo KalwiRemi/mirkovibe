@@ -12,6 +12,8 @@ Nowi użytkownicy mogą założyć konto podając:
 
 Hasła są bezpiecznie haszowane w bazie danych przy użyciu algorytmu bcrypt (pgcrypto).
 
+Domyślnie rejestracja jest **wyłączona**. Gdy jest wyłączona, użytkownicy wchodzący na stronę rejestracji widzą komunikat „Rejestracja wyłączona" i nie mogą założyć konta. Wyjątkiem jest użytkownik o loginie zgodnym ze zmienną środowiskową `NAZWA_ADMINISTRATORA` – taki użytkownik może zarejestrować się zawsze i po rejestracji automatycznie otrzymuje uprawnienia administratora.
+
 **URL:** `/rejestracja`
 
 ---
@@ -119,6 +121,19 @@ Użytkownicy mogą oznaczać wpisy i komentarze tagami, wpisując `#nazwatagu` w
 Strona tagu wyświetla wszystkie wpisy, których treść zawiera dany tag, posortowane od najnowszych. Prezentacja jest identyczna jak na stronie głównej (tytuł, autor, wynik, komentarze, data).
 
 **URL strony tagu:** `/tag/{nazwatagu}`
+
+---
+
+## 11. Panel administratora
+
+Administrator to specjalny rodzaj użytkownika z rozszerzonymi uprawnieniami. Link do panelu administratora jest widoczny w nawigacji wyłącznie dla administratora.
+
+W panelu administrator może:
+- **Włączyć lub wyłączyć rejestrację** – checkbox „Rejestracja włączona". Gdy rejestracja jest wyłączona, strona `/rejestracja` wyświetla komunikat „Rejestracja wyłączona" dla zwykłych użytkowników.
+
+Dostęp do panelu wymaga zalogowania jako administrator. Próba wejścia bez uprawnień zwraca błąd 403.
+
+**URL:** `/admin`
 
 ---
 
