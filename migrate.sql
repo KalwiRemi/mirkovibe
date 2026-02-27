@@ -61,6 +61,12 @@ CREATE TABLE IF NOT EXISTS konfiguracja (
 INSERT INTO konfiguracja (klucz, wartosc) VALUES ('rejestracja_wlaczona', 'false')
     ON CONFLICT (klucz) DO NOTHING;
 
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_wpisu', '12')
+    ON CONFLICT (klucz) DO NOTHING;
+
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_komentarza', '1')
+    ON CONFLICT (klucz) DO NOTHING;
+
 CREATE OR REPLACE VIEW wpisy_z_wynikiem AS
 SELECT
     w.id,
