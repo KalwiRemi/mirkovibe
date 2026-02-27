@@ -100,7 +100,65 @@ switch ($strona) {
         echo '<h1>Wpis</h1>';
         break;
     case 'dodaj':
+        if (!isset($_SESSION['uzytkownik_id'])) {
+            header('Location: index.php?strona=logowanie');
+            exit;
+        }
+
+        $bledy = [];
+        $tytul_wpisany = '';
+        $tresc_wpisana = '';
+        $link_wpisany  = '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $tytul_wpisany = trim($_POST['tytul'] ?? '');
+            $tresc_wpisana = trim($_POST['tresc'] ?? '');
+            $link_wpisany  = trim($_POST['link']  ?? '');
+
+            if ($tytul_wpisany === '') {
+                $bledy[] = 'Tytuł jest wymagany.';
+            }
+            if ($tresc_wpisana === '' && $link_wpisany === '') {
+                $bledy[] = 'Podaj treść lub link.';
+            }
+
+            if (empty($bledy)) {
+                try {
+                    $stmt = $polaczenie->prepare(
+                        'INSERT INTO wpisy (tytul, tresc, link, autor_id)
+                         VALUES (:tytul, :tresc, :link, :autor_id)
+                         RETURNING id'
+                    );
+                    $stmt->execute([
+                        ':tytul'    => $tytul_wpisany,
+                        ':tresc'    => $tresc_wpisana ?: null,
+                        ':link'     => $link_wpisany  ?: null,
+                        ':autor_id' => $_SESSION['uzytkownik_id'],
+                    ]);
+                    $nowy_id = (int)$stmt->fetchColumn();
+                    header('Location: index.php?strona=wpis&id=' . $nowy_id);
+                    exit;
+                } catch (PDOException $e) {
+                    error_log('Błąd dodawania wpisu: ' . $e->getMessage());
+                    $bledy[] = 'Wystąpił błąd podczas dodawania wpisu. Spróbuj ponownie.';
+                }
+            }
+        }
+
         echo '<h1>Dodaj wpis</h1>';
+        if (!empty($bledy)) {
+            echo '<ul style="color:red;margin-bottom:1rem;">';
+            foreach ($bledy as $blad) {
+                echo '<li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li>';
+            }
+            echo '</ul>';
+        }
+        echo '<form method="post" style="display:flex;flex-direction:column;gap:0.75rem;max-width:600px;">';
+        echo '<input type="text" name="tytul" placeholder="Tytuł" value="' . htmlspecialchars($tytul_wpisany, ENT_QUOTES, 'UTF-8') . '" required>';
+        echo '<textarea name="tresc" placeholder="Treść (opcjonalnie)" rows="5" style="resize:vertical;">' . htmlspecialchars($tresc_wpisana, ENT_QUOTES, 'UTF-8') . '</textarea>';
+        echo '<input type="url" name="link" placeholder="Link (opcjonalnie)" value="' . htmlspecialchars($link_wpisany, ENT_QUOTES, 'UTF-8') . '">';
+        echo '<button type="submit">Dodaj wpis</button>';
+        echo '</form>';
         break;
     case 'logowanie':
         if (isset($_SESSION['uzytkownik_id'])) {
