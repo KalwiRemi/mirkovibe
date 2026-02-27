@@ -25,26 +25,27 @@ $dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyl
 
 function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = ''): string {
     $html  = '<div id="komentarze-sekcja">';
-    $html .= '<section style="margin-top:2rem;">';
-    $html .= '<h2 style="margin-bottom:1rem;">Komentarze (' . count($komentarze) . ')</h2>';
+    $html .= '<section class="comments-section">';
+    $html .= '<h2>Komentarze (' . count($komentarze) . ')</h2>';
 
     if (empty($komentarze)) {
-        $html .= '<p>Brak komentarzy.</p>';
+        $html .= '<p class="empty-state">Brak komentarzy.</p>';
     } else {
-        $html .= '<ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">';
+        $html .= '<ul class="comment-list">';
         foreach ($komentarze as $komentarz) {
             $k_id    = (int)$komentarz['id'];
             $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
             $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
             $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
             $k_wynik = (int)($komentarz['wynik'] ?? 0);
-            $html .= '<li style="background:#fff;border-radius:6px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
-            $html .= '<div style="font-size:0.85rem;color:#555;margin-bottom:0.4rem;">';
-            $html .= '<strong>' . $k_autor . '</strong> &nbsp;|&nbsp; ' . $k_data;
-            $html .= ' &nbsp;|&nbsp; Wynik: <span id="wynik-komentarza-' . $k_id . '"><strong>' . $k_wynik . '</strong></span>';
+            $html .= '<li class="comment-item">';
+            $html .= '<div class="comment-meta">';
+            $html .= '<strong>' . $k_autor . '</strong>';
+            $html .= '<span class="sep">|</span>' . $k_data;
+            $html .= '<span class="sep">|</span> Wynik: <span id="wynik-komentarza-' . $k_id . '" class="score">' . $k_wynik . '</span>';
             if ($zalogowany) {
-                $html .= ' <button type="button" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
-                $html .= ' <button type="button" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+                $html .= ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+                $html .= ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
             }
             $html .= '</div>';
             $html .= '<div>' . nl2br($k_tresc) . '</div>';
@@ -56,13 +57,13 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
 
     if ($zalogowany) {
         $akcja = htmlspecialchars('index.php?strona=dodaj_komentarz&id=' . $wpis_id, ENT_QUOTES, 'UTF-8');
-        $html .= '<form method="post" style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.75rem;"'
+        $html .= '<form method="post" class="form-stack form-stack--comment"'
                . ' hx-post="' . $akcja . '" hx-target="#komentarze-sekcja" hx-swap="outerHTML">';
         if ($blad !== '') {
-            $html .= '<p style="color:red;">' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</p>';
+            $html .= '<ul class="error-list"><li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li></ul>';
         }
-        $html .= '<textarea name="tresc" placeholder="Dodaj komentarz..." rows="3" maxlength="2000" style="resize:vertical;" required></textarea>';
-        $html .= '<button type="submit" style="align-self:flex-start;">Wyślij komentarz</button>';
+        $html .= '<textarea name="tresc" placeholder="Dodaj komentarz..." rows="3" maxlength="2000" required></textarea>';
+        $html .= '<button type="submit" class="btn-primary">Wyślij komentarz</button>';
         $html .= '</form>';
     }
 
@@ -110,7 +111,7 @@ switch ($strona) {
         if (empty($wpisy)) {
             echo '<p>Brak wpisów.</p>';
         } else {
-            echo '<ul style="list-style:none;display:flex;flex-direction:column;gap:1rem;margin-top:1rem;">';
+            echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
                 $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
                 $autor = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
@@ -121,17 +122,19 @@ switch ($strona) {
                     ENT_QUOTES, 'UTF-8'
                 );
                 $id = (int)$wpis['id'];
-                echo '<li style="background:#fff;border-radius:6px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
-                echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" style="font-size:1.1rem;font-weight:bold;text-decoration:none;color:#1a1a2e;">' . $tytul . '</a>';
-                echo '<div style="margin-top:0.4rem;font-size:0.85rem;color:#555;">';
-                echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
-                echo 'Wynik: <span id="wynik-wpisu-' . $id . '"><strong>' . $wynik . '</strong></span>';
+                echo '<li class="card">';
+                echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                echo '<div class="card-meta">';
+                echo 'Autor: <strong>' . $autor . '</strong>';
+                echo '<span class="sep">|</span>';
+                echo 'Wynik: <span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
                 if (isset($_SESSION['uzytkownik_id'])) {
-                    echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
-                    echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+                    echo ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+                    echo ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
                 }
-                echo ' &nbsp;|&nbsp; ';
-                echo 'Komentarze: <strong>' . $komentarze . '</strong> &nbsp;|&nbsp; ';
+                echo '<span class="sep">|</span>';
+                echo 'Komentarze: <strong>' . $komentarze . '</strong>';
+                echo '<span class="sep">|</span>';
                 echo $data;
                 echo '</div>';
                 echo '</li>';
@@ -140,10 +143,10 @@ switch ($strona) {
         }
 
         if ($liczba_stron > 1) {
-            echo '<nav style="margin-top:1.5rem;display:flex;gap:0.5rem;align-items:center;">';
+            echo '<nav class="pagination">';
             for ($i = 1; $i <= $liczba_stron; $i++) {
-                $aktywna = $i === $podstrona ? 'font-weight:bold;text-decoration:underline;' : '';
-                echo '<a href="index.php?strona=glowna&amp;podstrona=' . $i . '" style="' . $aktywna . '">' . $i . '</a>';
+                $aktywna = $i === $podstrona ? ' active' : '';
+                echo '<a href="index.php?strona=glowna&amp;podstrona=' . $i . '" class="' . $aktywna . '">' . $i . '</a>';
             }
             echo '</nav>';
         }
@@ -180,31 +183,32 @@ switch ($strona) {
         $wynik = (int)$wpis['wynik'];
         $data  = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
 
-        echo '<article style="background:#fff;border-radius:6px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
-        echo '<h1 style="margin-bottom:0.75rem;">' . $tytul . '</h1>';
+        echo '<article class="article-card">';
+        echo '<h1>' . $tytul . '</h1>';
 
         if (!empty($wpis['tresc'])) {
-            echo '<div style="margin-bottom:1rem;line-height:1.6;">' . nl2br(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
+            echo '<div class="article-body">' . nl2br(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
         }
         if (!empty($wpis['link'])) {
             $link_raw = $wpis['link'];
             $link_schema = strtolower(parse_url($link_raw, PHP_URL_SCHEME));
             if (in_array($link_schema, ['http', 'https'], true)) {
                 $link = htmlspecialchars($link_raw, ENT_QUOTES, 'UTF-8');
-                echo '<p style="margin-bottom:1rem;"><a href="' . $link . '" rel="noopener noreferrer" target="_blank">' . $link . '</a></p>';
+                echo '<a href="' . $link . '" class="article-link" rel="noopener noreferrer" target="_blank">' . $link . '</a>';
             }
         }
 
-        echo '<p style="font-size:0.85rem;color:#555;">';
-        echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
-        echo 'Wynik: <span id="wynik-wpisu-' . $wpis_id . '"><strong>' . $wynik . '</strong></span>';
+        echo '<div class="card-meta">';
+        echo 'Autor: <strong>' . $autor . '</strong>';
+        echo '<span class="sep">|</span>';
+        echo 'Wynik: <span id="wynik-wpisu-' . $wpis_id . '" class="score">' . $wynik . '</span>';
         if (isset($_SESSION['uzytkownik_id'])) {
-            echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
-            echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+            echo ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+            echo ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
         }
-        echo ' &nbsp;|&nbsp; ';
+        echo '<span class="sep">|</span>';
         echo $data;
-        echo '</p>';
+        echo '</div>';
         echo '</article>';
 
         try {
@@ -275,17 +279,17 @@ switch ($strona) {
 
         echo '<h1>Dodaj wpis</h1>';
         if (!empty($bledy)) {
-            echo '<ul style="color:red;margin-bottom:1rem;">';
+            echo '<ul class="error-list">';
             foreach ($bledy as $blad) {
                 echo '<li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li>';
             }
             echo '</ul>';
         }
-        echo '<form method="post" style="display:flex;flex-direction:column;gap:0.75rem;max-width:600px;">';
+        echo '<form method="post" class="form-stack">';
         echo '<input type="text" name="tytul" placeholder="Tytuł" value="' . htmlspecialchars($tytul_wpisany, ENT_QUOTES, 'UTF-8') . '" required>';
-        echo '<textarea name="tresc" placeholder="Treść (opcjonalnie)" rows="5" style="resize:vertical;">' . htmlspecialchars($tresc_wpisana, ENT_QUOTES, 'UTF-8') . '</textarea>';
+        echo '<textarea name="tresc" placeholder="Treść (opcjonalnie)" rows="5">' . htmlspecialchars($tresc_wpisana, ENT_QUOTES, 'UTF-8') . '</textarea>';
         echo '<input type="url" name="link" placeholder="Link (opcjonalnie)" value="' . htmlspecialchars($link_wpisany, ENT_QUOTES, 'UTF-8') . '">';
-        echo '<button type="submit">Dodaj wpis</button>';
+        echo '<button type="submit" class="btn-primary">Dodaj wpis</button>';
         echo '</form>';
         break;
     case 'logowanie':
@@ -332,18 +336,19 @@ switch ($strona) {
 
         echo '<h1>Logowanie</h1>';
         if (!empty($bledy)) {
-            echo '<ul style="color:red;margin-bottom:1rem;">';
+            echo '<ul class="error-list">';
             foreach ($bledy as $blad) {
                 echo '<li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li>';
             }
             echo '</ul>';
         }
-        echo '<form method="post" style="display:flex;flex-direction:column;gap:0.75rem;max-width:360px;">';
+        echo '<div class="auth-wrap"><form method="post" class="form-stack">';
         echo '<input type="text" name="nazwa" placeholder="Nazwa użytkownika" value="' . htmlspecialchars($nazwa_wpisana, ENT_QUOTES, 'UTF-8') . '" required>';
         echo '<input type="password" name="haslo" placeholder="Hasło" required>';
-        echo '<button type="submit">Zaloguj się</button>';
+        echo '<button type="submit" class="btn-primary">Zaloguj się</button>';
         echo '</form>';
-        echo '<p style="margin-top:1rem;">Nie masz konta? <a href="index.php?strona=rejestracja">Zarejestruj się</a></p>';
+        echo '<p class="auth-hint">Nie masz konta? <a href="index.php?strona=rejestracja">Zarejestruj się</a></p>';
+        echo '</div>';
         break;
     case 'rejestracja':
         $bledy = [];
@@ -385,18 +390,18 @@ switch ($strona) {
 
         echo '<h1>Rejestracja</h1>';
         if (!empty($bledy)) {
-            echo '<ul style="color:red;margin-bottom:1rem;">';
+            echo '<ul class="error-list">';
             foreach ($bledy as $blad) {
                 echo '<li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li>';
             }
             echo '</ul>';
         }
-        echo '<form method="post" style="display:flex;flex-direction:column;gap:0.75rem;max-width:360px;">';
+        echo '<div class="auth-wrap"><form method="post" class="form-stack">';
         echo '<input type="text" name="nazwa" placeholder="Nazwa użytkownika" value="' . htmlspecialchars($nazwa_wpisana, ENT_QUOTES, 'UTF-8') . '" required>';
         echo '<input type="password" name="haslo" placeholder="Hasło (min. 6 znaków)" required>';
         echo '<input type="password" name="haslo2" placeholder="Powtórz hasło" required>';
-        echo '<button type="submit">Zarejestruj się</button>';
-        echo '</form>';
+        echo '<button type="submit" class="btn-primary">Zarejestruj się</button>';
+        echo '</form></div>';
         break;
     case 'dodaj_komentarz':
         if (ob_get_level() > 0) {
@@ -405,14 +410,14 @@ switch ($strona) {
 
         if (!isset($_SESSION['uzytkownik_id'])) {
             http_response_code(403);
-            echo '<p style="color:red;">Musisz być zalogowany, aby dodać komentarz.</p>';
+            echo '<ul class="error-list"><li>Musisz być zalogowany, aby dodać komentarz.</li></ul>';
             exit;
         }
 
         $wpis_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if ($wpis_id <= 0) {
             http_response_code(400);
-            echo '<p style="color:red;">Nieprawidłowy identyfikator wpisu.</p>';
+            echo '<ul class="error-list"><li>Nieprawidłowy identyfikator wpisu.</li></ul>';
             exit;
         }
 
@@ -555,26 +560,388 @@ $tresc = ob_get_clean();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mirkovibe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org" defer></script>
     <style>
+        :root {
+            --bg:        #f7f5f0;
+            --surface:   #ffffff;
+            --primary:   #0d1b2a;
+            --accent:    #e8552a;
+            --accent-lt: #fff0ec;
+            --muted:     #6b7280;
+            --border:    #e2ddd6;
+            --radius:    4px;
+            --shadow:    0 1px 4px rgba(13,27,42,.08), 0 4px 16px rgba(13,27,42,.06);
+            --shadow-lg: 0 4px 24px rgba(13,27,42,.14);
+            --font-display: 'Syne', sans-serif;
+            --font-body:    'Libre Baskerville', Georgia, serif;
+            --transition:   180ms ease;
+        }
+
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: sans-serif; background: #f4f4f4; color: #222; display: flex; flex-direction: column; min-height: 100vh; }
-        header { background: #1a1a2e; color: #fff; padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 2rem; }
-        header .nazwa-serwisu { font-size: 1.4rem; font-weight: bold; text-decoration: none; color: #fff; }
-        nav a { color: #ccc; text-decoration: none; margin-right: 1rem; font-size: 0.95rem; }
-        nav a:hover { color: #fff; }
-        main { flex: 1; max-width: 900px; width: 100%; margin: 2rem auto; padding: 0 1rem; }
-        footer { background: #1a1a2e; color: #aaa; text-align: center; padding: 0.75rem 1.5rem; font-size: 0.85rem; }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            color: var(--primary);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            font-size: 15px;
+            line-height: 1.65;
+        }
+
+        /* ── Header ── */
+        header {
+            background: var(--primary);
+            color: #fff;
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2.5rem;
+            height: 56px;
+            border-bottom: 3px solid var(--accent);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header .nazwa-serwisu {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 800;
+            text-decoration: none;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        header .nazwa-serwisu span { color: var(--accent); }
+
+        nav { display: flex; align-items: center; gap: 0.25rem; }
+
+        nav a {
+            color: rgba(255,255,255,.65);
+            text-decoration: none;
+            font-family: var(--font-display);
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 0.35rem 0.75rem;
+            border-radius: var(--radius);
+            transition: color var(--transition), background var(--transition);
+        }
+
+        nav a:hover { color: #fff; background: rgba(255,255,255,.1); }
+
+        .nav-user {
+            color: rgba(255,255,255,.5);
+            font-size: 0.82rem;
+            font-family: var(--font-display);
+            padding: 0 0.5rem;
+        }
+
+        /* ── Layout ── */
+        main {
+            flex: 1;
+            max-width: 860px;
+            width: 100%;
+            margin: 2.5rem auto;
+            padding: 0 1.25rem;
+            animation: fadeUp .35s ease both;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Typography ── */
+        h1 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        /* ── Cards / List ── */
+        .card-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.1rem 1.25rem;
+            box-shadow: var(--shadow);
+            transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: transparent;
+            border-radius: var(--radius) 0 0 var(--radius);
+            transition: background var(--transition);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+            border-color: #cdc8c0;
+        }
+
+        .card:hover::before { background: var(--accent); }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 1.05rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: var(--primary);
+            letter-spacing: -0.2px;
+            transition: color var(--transition);
+        }
+
+        .card-title:hover { color: var(--accent); }
+
+        .card-meta {
+            margin-top: 0.45rem;
+            font-size: 0.8rem;
+            color: var(--muted);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.4rem 0.6rem;
+        }
+
+        .card-meta strong { color: var(--primary); }
+
+        .card-meta .sep { color: var(--border); }
+
+        /* ── Score & Vote buttons ── */
+        .score { font-weight: 700; color: var(--primary); }
+
+        .btn-vote {
+            cursor: pointer;
+            padding: 1px 7px;
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+            font-weight: 700;
+            font-family: var(--font-display);
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--muted);
+            transition: background var(--transition), color var(--transition), border-color var(--transition);
+            line-height: 1.6;
+        }
+
+        .btn-vote.up:hover   { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+        .btn-vote.down:hover { background: #ffebee; border-color: #ef9a9a; color: #c62828; }
+
+        /* ── Article (single post) ── */
+        .article-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem 2.25rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .article-card h1 { margin-bottom: 1rem; }
+
+        .article-body {
+            margin-bottom: 1.25rem;
+            line-height: 1.75;
+            color: #2a2a2a;
+        }
+
+        .article-link {
+            display: inline-block;
+            margin-bottom: 1.25rem;
+            color: var(--accent);
+            font-size: 0.9rem;
+            word-break: break-all;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        /* ── Comments ── */
+        .comments-section { margin-top: 2rem; }
+
+        .comment-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        .comment-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.9rem 1.1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .comment-meta {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-bottom: 0.4rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.3rem 0.5rem;
+        }
+
+        .comment-meta strong { color: var(--primary); }
+
+        /* ── Forms ── */
+        .form-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-width: 560px;
+        }
+
+        .form-stack input,
+        .form-stack textarea {
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            padding: 0.6rem 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            color: var(--primary);
+            transition: border-color var(--transition), box-shadow var(--transition);
+            outline: none;
+            width: 100%;
+        }
+
+        .form-stack input:focus,
+        .form-stack textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(232,85,42,.12);
+        }
+
+        .btn-primary {
+            font-family: var(--font-display);
+            font-size: 0.88rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 0.6rem 1.4rem;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            align-self: flex-start;
+            transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+        }
+
+        .btn-primary:hover {
+            background: #c9441a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(232,85,42,.35);
+        }
+
+        .form-stack textarea { resize: vertical; }
+        .form-stack--comment { margin-top: 1.25rem; }
+
+        /* ── Empty state ── */
+        .empty-state { margin-top: 0.75rem; color: var(--muted); }
+        .error-list {
+            list-style: none;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .error-list li {
+            background: #fff3f1;
+            border: 1px solid #f5c6bc;
+            border-radius: var(--radius);
+            padding: 0.45rem 0.85rem;
+            font-size: 0.88rem;
+            color: #b33016;
+        }
+
+        /* ── Pagination ── */
+        .pagination {
+            margin-top: 1.75rem;
+            display: flex;
+            gap: 0.35rem;
+            align-items: center;
+        }
+
+        .pagination a {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 0.3rem 0.7rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            text-decoration: none;
+            color: var(--muted);
+            transition: background var(--transition), border-color var(--transition), color var(--transition);
+        }
+
+        .pagination a:hover,
+        .pagination a.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        /* ── Footer ── */
+        footer {
+            background: var(--primary);
+            color: rgba(255,255,255,.4);
+            text-align: center;
+            padding: 1rem 1.5rem;
+            font-size: 0.8rem;
+            font-family: var(--font-display);
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Auth pages ── */
+        .auth-wrap { max-width: 400px; }
+        .auth-hint { margin-top: 1rem; font-size: 0.88rem; color: var(--muted); }
+        .auth-hint a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
     </style>
 </head>
 <body>
     <header>
-        <a class="nazwa-serwisu" href="index.php">Mirkovibe</a>
+        <a class="nazwa-serwisu" href="index.php">Mirko<span>vibe</span></a>
         <nav>
             <a href="index.php?strona=glowna">Główna</a>
             <a href="index.php?strona=dodaj">Dodaj wpis</a>
             <?php if (isset($_SESSION['uzytkownik_id'])): ?>
-                <span style="color:#ccc;font-size:0.95rem;">Witaj, <?= htmlspecialchars($_SESSION['uzytkownik_nazwa'], ENT_QUOTES, 'UTF-8') ?>!</span>
+                <span class="nav-user">Witaj, <?= htmlspecialchars($_SESSION['uzytkownik_nazwa'], ENT_QUOTES, 'UTF-8') ?>!</span>
                 <a href="index.php?strona=wyloguj">Wyloguj</a>
             <?php else: ?>
                 <a href="index.php?strona=logowanie">Logowanie</a>
