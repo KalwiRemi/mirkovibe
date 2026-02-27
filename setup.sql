@@ -14,3 +14,12 @@ CREATE TABLE wpisy (
     data_dodania TIMESTAMPTZ DEFAULT NOW(),
     wynik        INT DEFAULT 0
 );
+
+CREATE TABLE komentarze (
+    id           SERIAL PRIMARY KEY,
+    wpis_id      INT REFERENCES wpisy(id),
+    autor_id     INT REFERENCES uzytkownicy(id),
+    tresc        TEXT NOT NULL,
+    data_dodania TIMESTAMPTZ DEFAULT NOW(),
+    wynik        INT DEFAULT 0
+);
