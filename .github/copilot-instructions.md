@@ -25,6 +25,15 @@ Mirkovibe to prosta alternatywa dla Wykopu i Reddita, zbudowana w PHP, PostgreSQ
 - **htmx** – dynamiczne akcje bez przeładowania strony
 - **Apache mod_rewrite** – przyjazne adresy URL (`.htaccess`)
 
+## Kluczowe elementy schematu bazy
+
+- `uzytkownicy` – użytkownicy; kolumna `jest_adminem` oznacza administratora
+- `konfiguracja` – ustawienia aplikacji (klucz–wartość); np. `rejestracja_wlaczona` (`true`/`false`, domyślnie `false`)
+- `wpisy` – wpisy tekstowe i linki (`rodzaj`: `wpis` lub `link`)
+- `komentarze` – komentarze do wpisów
+- `glosy` – głosy na wpisy i komentarze (wartość `1` lub `-1`)
+- widok `wpisy_z_wynikiem` – wpisy z wyliczonym wynikiem głosowania
+
 ## Środowisko deweloperskie
 
 Projekt używa Dev Container. Po otwarciu w VS Code lub Codespaces:
@@ -38,6 +47,7 @@ Zmienne środowiskowe połączenia z bazą:
 - `BAZA_NAZWA` – nazwa bazy
 - `BAZA_UZYTKOWNIK` – użytkownik
 - `BAZA_HASLO` – hasło
+- `NAZWA_ADMINISTRATORA` – opcjonalna; nazwa użytkownika, który automatycznie otrzymuje rolę administratora po rejestracji
 
 ## Jak wprowadzać zmiany
 
