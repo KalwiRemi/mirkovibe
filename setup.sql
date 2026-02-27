@@ -7,7 +7,6 @@ CREATE TABLE uzytkownicy (
 
 CREATE TABLE wpisy (
     id           SERIAL PRIMARY KEY,
-    tytul        TEXT NOT NULL,
     tresc        TEXT,
     link         TEXT,
     autor_id     INT REFERENCES uzytkownicy(id),
