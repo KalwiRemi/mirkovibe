@@ -99,6 +99,16 @@ Zalogowani użytkownicy mogą głosować na komentarze przyciskami `+` i `−`. 
 
 ---
 
+## 10. Tagi
+
+Użytkownicy mogą oznaczać wpisy i komentarze tagami, wpisując `#nazwatagu` w treści. Tagi są automatycznie parsowane podczas wyświetlania i zamieniane na klikalne linki prowadzące do strony tagu.
+
+Strona tagu wyświetla wszystkie wpisy, których treść zawiera dany tag, posortowane od najnowszych. Prezentacja jest identyczna jak na stronie głównej (tytuł, autor, wynik, komentarze, data).
+
+**URL strony tagu:** `index.php?strona=tag&tag={nazwatagu}`
+
+---
+
 ## Techniczny stack
 
 - **PHP** – logika aplikacji (jeden plik: `index.php`)

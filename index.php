@@ -21,7 +21,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag'];
 
 function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = ''): string {
     $html  = '<div id="komentarze-sekcja">';
@@ -48,7 +48,7 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
                 $html .= ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
             }
             $html .= '</div>';
-            $html .= '<div>' . nl2br($k_tresc) . '</div>';
+            $html .= '<div>' . nl2br(parsujTagi($k_tresc)) . '</div>';
             $html .= '</li>';
         }
         $html .= '</ul>';
@@ -70,6 +70,17 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     $html .= '</div>';
     return $html;
 }
+function parsujTagi(string $tekst): string {
+    return preg_replace_callback(
+        '/(^|[^\p{L}\p{N}_#])#([\p{L}\p{N}_]+)/u',
+        function ($m) {
+            $tag = $m[2];
+            return $m[1] . '<a href="index.php?strona=tag&amp;tag=' . rawurlencode($tag) . '" class="tag-link">#' . htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') . '</a>';
+        },
+        $tekst
+    );
+}
+
 $zadana_strona = isset($_GET['strona']) ? htmlspecialchars($_GET['strona'], ENT_QUOTES, 'UTF-8') : '';
 $strona = in_array($zadana_strona, $dozwolone_strony) ? $zadana_strona : 'glowna';
 
@@ -187,7 +198,7 @@ switch ($strona) {
         echo '<h1>' . $tytul . '</h1>';
 
         if (!empty($wpis['tresc'])) {
-            echo '<div class="article-body">' . nl2br(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
+            echo '<div class="article-body">' . nl2br(parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8'))) . '</div>';
         }
         if (!empty($wpis['link'])) {
             $link_raw = $wpis['link'];
@@ -539,6 +550,70 @@ switch ($strona) {
             http_response_code(500);
         }
         exit;
+    case 'tag':
+        $tag_nazwa = trim($_GET['tag'] ?? '');
+
+        if (!preg_match('/^[\p{L}\p{N}_]+$/u', $tag_nazwa) || $tag_nazwa === '') {
+            echo '<p>Nieprawidłowy tag.</p>';
+            break;
+        }
+
+        $tag_wyswietlany = htmlspecialchars($tag_nazwa, ENT_QUOTES, 'UTF-8');
+
+        try {
+            $stmt = $polaczenie->prepare(
+                'SELECT w.id, w.tytul, u.nazwa AS autor, w.wynik, w.data_dodania,
+                        COUNT(k.id) AS liczba_komentarzy
+                 FROM wpisy_z_wynikiem w
+                 JOIN uzytkownicy u ON u.id = w.autor_id
+                 LEFT JOIN komentarze k ON k.wpis_id = w.id
+                 WHERE w.tresc ~* :pattern
+                 GROUP BY w.id, w.tytul, u.nazwa, w.wynik, w.data_dodania
+                 ORDER BY w.data_dodania DESC'
+            );
+            $stmt->execute([':pattern' => '(^|[^[:alnum:]_#])#' . $tag_nazwa . '([^[:alnum:]_]|$)']);
+            $wpisy = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania wpisów tagu: ' . $e->getMessage());
+            $wpisy = [];
+        }
+
+        echo '<h1>Wpisy z tagiem #' . $tag_wyswietlany . '</h1>';
+
+        if (empty($wpisy)) {
+            echo '<p class="empty-state">Brak wpisów z tym tagiem.</p>';
+        } else {
+            echo '<ul class="card-list">';
+            foreach ($wpisy as $wpis) {
+                $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+                $autor = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
+                $wynik = (int)$wpis['wynik'];
+                $komentarze = (int)$wpis['liczba_komentarzy'];
+                $data = htmlspecialchars(
+                    date('d.m.Y H:i', strtotime($wpis['data_dodania'])),
+                    ENT_QUOTES, 'UTF-8'
+                );
+                $id = (int)$wpis['id'];
+                echo '<li class="card">';
+                echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                echo '<div class="card-meta">';
+                echo 'Autor: <strong>' . $autor . '</strong>';
+                echo '<span class="sep">|</span>';
+                echo 'Wynik: <span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
+                if (isset($_SESSION['uzytkownik_id'])) {
+                    echo ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+                    echo ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
+                }
+                echo '<span class="sep">|</span>';
+                echo 'Komentarze: <strong>' . $komentarze . '</strong>';
+                echo '<span class="sep">|</span>';
+                echo $data;
+                echo '</div>';
+                echo '</li>';
+            }
+            echo '</ul>';
+        }
+        break;
     case 'wyloguj':
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
@@ -830,6 +905,11 @@ $tresc = ob_get_clean();
         .auth-wrap { max-width: 360px; }
         .auth-hint { margin-top: 0.75rem; font-size: 0.85rem; color: #555; }
         .auth-hint a { color: #000; text-decoration: underline; }
+
+        /* ── Tags ── */
+        .tag-link { color: #000; text-decoration: none; font-weight: bold; }
+        .tag-link:hover { text-decoration: underline; }
+        .tag-link:visited { color: #444; }
     </style>
 </head>
 <body>
