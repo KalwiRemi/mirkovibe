@@ -669,7 +669,7 @@ $tresc = ob_get_clean();
             padding: 1px 4px;
         }
 
-        nav { display: flex; align-items: center; gap: 0.1rem; }
+        nav { display: flex; align-items: center; gap: 0.1rem; flex: 1; }
 
         nav a {
             color: #fff;
@@ -681,6 +681,9 @@ $tresc = ob_get_clean();
         nav a:hover { text-decoration: underline; }
 
         .nav-sep { color: #888; padding: 0 2px; }
+
+        .nav-github { margin-left: auto; color: #fff; text-decoration: none; font-size: 0.85rem; padding: 2px 6px; }
+        .nav-github:hover { text-decoration: underline; }
 
         .nav-user {
             color: #ccc;
@@ -930,6 +933,7 @@ $tresc = ob_get_clean();
                 <span class="nav-sep">|</span>
                 <a href="index.php?strona=rejestracja">Rejestracja</a>
             <?php endif; ?>
+            <a class="nav-github" href="https://github.com/KalwiRemi/mirkovibe" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
     </header>
     <main>
