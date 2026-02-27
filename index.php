@@ -23,6 +23,7 @@ $dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyl
 $zadana_strona = isset($_GET['strona']) ? htmlspecialchars($_GET['strona'], ENT_QUOTES, 'UTF-8') : '';
 $strona = in_array($zadana_strona, $dozwolone_strony) ? $zadana_strona : 'glowna';
 
+ob_start();
 switch ($strona) {
     case 'glowna':
         echo '<h1>Lista wpisów</h1>';
@@ -43,3 +44,41 @@ switch ($strona) {
         echo '<h1>Wylogowano</h1>';
         break;
 }
+$tresc = ob_get_clean();
+
+?><!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirkovibe</title>
+    <script src="https://unpkg.com/htmx.org" defer></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f4f4f4; color: #222; display: flex; flex-direction: column; min-height: 100vh; }
+        header { background: #1a1a2e; color: #fff; padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 2rem; }
+        header .nazwa-serwisu { font-size: 1.4rem; font-weight: bold; text-decoration: none; color: #fff; }
+        nav a { color: #ccc; text-decoration: none; margin-right: 1rem; font-size: 0.95rem; }
+        nav a:hover { color: #fff; }
+        main { flex: 1; max-width: 900px; width: 100%; margin: 2rem auto; padding: 0 1rem; }
+        footer { background: #1a1a2e; color: #aaa; text-align: center; padding: 0.75rem 1.5rem; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <a class="nazwa-serwisu" href="index.php">Mirkovibe</a>
+        <nav>
+            <a href="index.php?strona=glowna">Główna</a>
+            <a href="index.php?strona=dodaj">Dodaj wpis</a>
+            <a href="index.php?strona=logowanie">Logowanie</a>
+            <a href="index.php?strona=rejestracja">Rejestracja</a>
+        </nav>
+    </header>
+    <main>
+        <?= $tresc ?>
+    </main>
+    <footer>
+        &copy; <?= date('Y') ?> Mirkovibe
+    </footer>
+</body>
+</html>
