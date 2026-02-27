@@ -28,7 +28,73 @@ $strona = in_array($zadana_strona, $dozwolone_strony) ? $zadana_strona : 'glowna
 ob_start();
 switch ($strona) {
     case 'glowna':
+        $wpisow_na_strone = 10;
+        $podstrona = max(1, (int)($_GET['podstrona'] ?? 1));
+        $przesuniecie = ($podstrona - 1) * $wpisow_na_strone;
+
+        try {
+            $stmt_licznik = $polaczenie->query('SELECT COUNT(*) FROM wpisy_z_wynikiem');
+            $liczba_wpisow = (int)$stmt_licznik->fetchColumn();
+
+            $stmt = $polaczenie->prepare(
+                'SELECT w.id, w.tytul, u.nazwa AS autor, w.wynik, w.data_dodania,
+                        COUNT(k.id) AS liczba_komentarzy
+                 FROM wpisy_z_wynikiem w
+                 JOIN uzytkownicy u ON u.id = w.autor_id
+                 LEFT JOIN komentarze k ON k.wpis_id = w.id
+                 GROUP BY w.id, w.tytul, u.nazwa, w.wynik, w.data_dodania
+                 ORDER BY w.data_dodania DESC
+                 LIMIT :limit OFFSET :offset'
+            );
+            $stmt->bindValue(':limit',  $wpisow_na_strone, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $przesuniecie,     PDO::PARAM_INT);
+            $stmt->execute();
+            $wpisy = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania wpisów: ' . $e->getMessage());
+            $wpisy = [];
+            $liczba_wpisow = 0;
+        }
+
+        $liczba_stron = (int)ceil($liczba_wpisow / $wpisow_na_strone);
+
         echo '<h1>Lista wpisów</h1>';
+
+        if (empty($wpisy)) {
+            echo '<p>Brak wpisów.</p>';
+        } else {
+            echo '<ul style="list-style:none;display:flex;flex-direction:column;gap:1rem;margin-top:1rem;">';
+            foreach ($wpisy as $wpis) {
+                $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+                $autor = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
+                $wynik = (int)$wpis['wynik'];
+                $komentarze = (int)$wpis['liczba_komentarzy'];
+                $data = htmlspecialchars(
+                    date('d.m.Y H:i', strtotime($wpis['data_dodania'])),
+                    ENT_QUOTES, 'UTF-8'
+                );
+                $id = (int)$wpis['id'];
+                echo '<li style="background:#fff;border-radius:6px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1);">';
+                echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" style="font-size:1.1rem;font-weight:bold;text-decoration:none;color:#1a1a2e;">' . $tytul . '</a>';
+                echo '<div style="margin-top:0.4rem;font-size:0.85rem;color:#555;">';
+                echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
+                echo 'Wynik: <strong>' . $wynik . '</strong> &nbsp;|&nbsp; ';
+                echo 'Komentarze: <strong>' . $komentarze . '</strong> &nbsp;|&nbsp; ';
+                echo $data;
+                echo '</div>';
+                echo '</li>';
+            }
+            echo '</ul>';
+        }
+
+        if ($liczba_stron > 1) {
+            echo '<nav style="margin-top:1.5rem;display:flex;gap:0.5rem;align-items:center;">';
+            for ($i = 1; $i <= $liczba_stron; $i++) {
+                $aktywna = $i === $podstrona ? 'font-weight:bold;text-decoration:underline;' : '';
+                echo '<a href="index.php?strona=glowna&amp;podstrona=' . $i . '" style="' . $aktywna . '">' . $i . '</a>';
+            }
+            echo '</nav>';
+        }
         break;
     case 'wpis':
         echo '<h1>Wpis</h1>';
