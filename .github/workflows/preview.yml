@@ -8,6 +8,7 @@ jobs:
   deploy-preview:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
       - name: Pobierz kod
@@ -36,32 +37,31 @@ jobs:
         if: steps.migrate-check.outputs.changed == 'true'
         run: psql "${{ steps.neon-branch.outputs.db_url_with_pooler }}" --variable ON_ERROR_STOP=1 -f migrate.sql
 
-      - name: Skonfiguruj flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Utwórz lub zaktualizuj aplikację preview na Fly.io
+      - name: Parsuj URL bazy danych
+        id: parse-db
         run: |
-          APP_NAME="mirkovibe-pr-${{ github.event.pull_request.number }}"
           DB_URL="${{ steps.neon-branch.outputs.db_url_with_pooler }}"
-
           { read -r DB_HOST; read -r DB_NAME; read -r DB_USER; read -r DB_PASS; } < <(python3 -c "import urllib.parse; u=urllib.parse.urlparse('$DB_URL'); print(u.hostname); print(u.path.lstrip('/')); print(u.username); print(u.password)")
-
           echo "::add-mask::$DB_PASS"
+          echo "host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "name=$DB_NAME" >> $GITHUB_OUTPUT
+          echo "user=$DB_USER" >> $GITHUB_OUTPUT
+          echo "pass=$DB_PASS" >> $GITHUB_OUTPUT
 
-          if ! flyctl status --app "$APP_NAME" > /dev/null 2>&1; then
-            flyctl apps create "$APP_NAME"
-          fi
-
-          flyctl secrets set \
-            BAZA_HOST="$DB_HOST" \
-            BAZA_NAZWA="$DB_NAME" \
-            BAZA_UZYTKOWNIK="$DB_USER" \
-            BAZA_HASLO="$DB_PASS" \
-            --app "$APP_NAME"
-
-          flyctl deploy --app "$APP_NAME" --config fly.toml --ha=false
+      - name: Deploy na Fly.io
+        id: deploy
+        uses: superfly/fly-pr-review-apps@1.2.1
+        with:
+          name: mirkovibe-pr-${{ github.event.pull_request.number }}
+          region: fra
+          secrets: >-
+            BAZA_HOST=${{ steps.parse-db.outputs.host }}
+            BAZA_NAZWA=${{ steps.parse-db.outputs.name }}
+            BAZA_UZYTKOWNIK=${{ steps.parse-db.outputs.user }}
+            BAZA_HASLO=${{ steps.parse-db.outputs.pass }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ secrets.FLY_ORG }}
 
       - name: Znajdź istniejący komentarz
         uses: peter-evans/find-comment@v3
@@ -77,5 +77,5 @@ jobs:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            🚀 **Preview dostępny pod adresem:** https://mirkovibe-pr-${{ github.event.pull_request.number }}.fly.dev
+            🚀 **Preview dostępny pod adresem:** ${{ steps.deploy.outputs.url }}
           edit-mode: replace

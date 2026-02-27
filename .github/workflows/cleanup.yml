@@ -7,8 +7,12 @@ on:
 jobs:
   cleanup-preview:
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
       - name: Usuń branch bazy danych Neon
         uses: neondatabase/delete-branch-action@v3
         with:
@@ -16,14 +20,10 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           branch: pr-${{ github.event.pull_request.number }}
 
-      - name: Skonfiguruj flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
       - name: Usuń aplikację preview na Fly.io
-        run: |
-          APP_NAME="mirkovibe-pr-${{ github.event.pull_request.number }}"
-          if flyctl status --app "$APP_NAME" > /dev/null 2>&1; then
-            flyctl apps destroy "$APP_NAME" --yes
-          fi
+        uses: superfly/fly-pr-review-apps@1.2.1
+        with:
+          name: mirkovibe-pr-${{ github.event.pull_request.number }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ secrets.FLY_ORG }}
