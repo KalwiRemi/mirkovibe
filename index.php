@@ -156,7 +156,7 @@ switch ($strona) {
             );
         }
         session_destroy();
-        header('Location: index.php?strona=glowna');
+        header('Location: index.php?strona=logowanie');
         exit;
 }
 $tresc = ob_get_clean();
