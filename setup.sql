@@ -4,3 +4,13 @@ CREATE TABLE uzytkownicy (
     haslo_hash       TEXT NOT NULL,
     data_rejestracji TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE TABLE wpisy (
+    id           SERIAL PRIMARY KEY,
+    tytul        TEXT NOT NULL,
+    tresc        TEXT,
+    link         TEXT,
+    autor_id     INT REFERENCES uzytkownicy(id),
+    data_dodania TIMESTAMPTZ DEFAULT NOW(),
+    wynik        INT DEFAULT 0
+);
