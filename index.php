@@ -44,8 +44,8 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
             $html .= '<span class="sep">|</span>' . $k_data;
             $html .= '<span class="sep">|</span> Wynik: <span id="wynik-komentarza-' . $k_id . '" class="score">' . $k_wynik . '</span>';
             if ($zalogowany) {
-                $html .= ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-                $html .= ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
+                $html .= ' <button type="button" class="btn-vote up" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+                $html .= ' <button type="button" class="btn-vote down" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
             }
             $html .= '</div>';
             $html .= '<div>' . nl2br(parsujTagi($k_tresc)) . '</div>';
@@ -56,7 +56,7 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     $html .= '</section>';
 
     if ($zalogowany) {
-        $akcja = htmlspecialchars('index.php?strona=dodaj_komentarz&id=' . $wpis_id, ENT_QUOTES, 'UTF-8');
+        $akcja = '/dodaj_komentarz/' . $wpis_id;
         $html .= '<form method="post" class="form-stack form-stack--comment"'
                . ' hx-post="' . $akcja . '" hx-target="#komentarze-sekcja" hx-swap="outerHTML">';
         if ($blad !== '') {
@@ -75,10 +75,62 @@ function parsujTagi(string $tekst): string {
         '/(^|[^\p{L}\p{N}_#])#([\p{L}\p{N}_]+)/u',
         function ($m) {
             $tag = $m[2];
-            return $m[1] . '<a href="index.php?strona=tag&amp;tag=' . rawurlencode($tag) . '" class="tag-link">#' . htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') . '</a>';
+            return $m[1] . '<a href="/tag/' . rawurlencode($tag) . '" class="tag-link">#' . htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') . '</a>';
         },
         $tekst
     );
+}
+
+if (!isset($_GET['strona'])) {
+    $uri    = strtok($_SERVER['REQUEST_URI'], '?');
+    $uri    = trim($uri, '/');
+    $czesci = $uri === '' ? [] : explode('/', $uri);
+    $seg0   = $czesci[0] ?? '';
+    $seg1   = isset($czesci[1]) && $czesci[1] !== '' ? $czesci[1] : null;
+    switch ($seg0) {
+        case 'wpis':
+            $_GET['strona'] = 'wpis';
+            if ($seg1 !== null && ctype_digit($seg1)) {
+                $_GET['id'] = $seg1;
+            }
+            break;
+        case 'dodaj':
+            $_GET['strona'] = 'dodaj';
+            break;
+        case 'logowanie':
+            $_GET['strona'] = 'logowanie';
+            break;
+        case 'rejestracja':
+            $_GET['strona'] = 'rejestracja';
+            break;
+        case 'wyloguj':
+            $_GET['strona'] = 'wyloguj';
+            break;
+        case 'dodaj_komentarz':
+            $_GET['strona'] = 'dodaj_komentarz';
+            if ($seg1 !== null && ctype_digit($seg1)) {
+                $_GET['id'] = $seg1;
+            }
+            break;
+        case 'glosuj':
+            $_GET['strona'] = 'glosuj';
+            break;
+        case 'glosuj_komentarz':
+            $_GET['strona'] = 'glosuj_komentarz';
+            break;
+        case 'tag':
+            $_GET['strona'] = 'tag';
+            if ($seg1 !== null && preg_match('/^[\p{L}\p{N}_]+$/u', $seg1)) {
+                $_GET['tag'] = $seg1;
+            }
+            break;
+        default:
+            $_GET['strona'] = 'glowna';
+            if ($seg1 !== null && ctype_digit($seg1)) {
+                $_GET['podstrona'] = $seg1;
+            }
+            break;
+    }
 }
 
 $zadana_strona = isset($_GET['strona']) ? htmlspecialchars($_GET['strona'], ENT_QUOTES, 'UTF-8') : '';
@@ -137,7 +189,7 @@ switch ($strona) {
                 if ($rodzaj === 'link') {
                     $tytul     = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
                     echo '<span class="type-badge type-badge--link">L</span> ';
-                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $tytul . '</a>';
                     if (!empty($wpis['link'])) {
                         $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
                         if (in_array($link_schema, ['http', 'https'], true)) {
@@ -150,15 +202,15 @@ switch ($strona) {
                     }
                 } else {
                     $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
-                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $podglad . '</a>';
+                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $podglad . '</a>';
                 }
                 echo '<div class="card-meta">';
                 echo 'Autor: <strong>' . $autor . '</strong>';
                 echo '<span class="sep">|</span>';
                 echo 'Wynik: <span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
                 if (isset($_SESSION['uzytkownik_id'])) {
-                    echo ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-                    echo ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
+                    echo ' <button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+                    echo ' <button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
                 }
                 echo '<span class="sep">|</span>';
                 echo 'Komentarze: <strong>' . $komentarze . '</strong>';
@@ -174,7 +226,7 @@ switch ($strona) {
             echo '<nav class="pagination">';
             for ($i = 1; $i <= $liczba_stron; $i++) {
                 $aktywna = $i === $podstrona ? ' active' : '';
-                echo '<a href="index.php?strona=glowna&amp;podstrona=' . $i . '" class="' . $aktywna . '">' . $i . '</a>';
+                echo '<a href="/glowna/' . $i . '" class="' . $aktywna . '">' . $i . '</a>';
             }
             echo '</nav>';
         }
@@ -238,8 +290,8 @@ switch ($strona) {
         echo '<span class="sep">|</span>';
         echo 'Wynik: <span id="wynik-wpisu-' . $wpis_id . '" class="score">' . $wynik . '</span>';
         if (isset($_SESSION['uzytkownik_id'])) {
-            echo ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-            echo ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
+            echo ' <button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+            echo ' <button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
         }
         echo '<span class="sep">|</span>';
         echo $data;
@@ -268,7 +320,7 @@ switch ($strona) {
         break;
     case 'dodaj':
         if (!isset($_SESSION['uzytkownik_id'])) {
-            header('Location: index.php?strona=logowanie');
+            header('Location: /logowanie');
             exit;
         }
 
@@ -332,7 +384,7 @@ switch ($strona) {
                         ':autor_id' => $_SESSION['uzytkownik_id'],
                     ]);
                     $nowy_id = (int)$stmt->fetchColumn();
-                    header('Location: index.php?strona=wpis&id=' . $nowy_id);
+                    header('Location: /wpis/' . $nowy_id);
                     exit;
                 } catch (PDOException $e) {
                     error_log('Błąd dodawania wpisu: ' . $e->getMessage());
@@ -382,7 +434,7 @@ switch ($strona) {
         break;
     case 'logowanie':
         if (isset($_SESSION['uzytkownik_id'])) {
-            header('Location: index.php?strona=glowna');
+            header('Location: /');
             exit;
         }
 
@@ -410,7 +462,7 @@ switch ($strona) {
                         session_regenerate_id(true);
                         $_SESSION['uzytkownik_id']   = $uzytkownik['id'];
                         $_SESSION['uzytkownik_nazwa'] = $uzytkownik['nazwa'];
-                        header('Location: index.php?strona=glowna');
+                        header('Location: /');
                         exit;
                     } else {
                         $bledy[] = 'Nieprawidłowa nazwa użytkownika lub hasło.';
@@ -435,7 +487,7 @@ switch ($strona) {
         echo '<input type="password" name="haslo" placeholder="Hasło" required>';
         echo '<button type="submit" class="btn-primary">Zaloguj się</button>';
         echo '</form>';
-        echo '<p class="auth-hint">Nie masz konta? <a href="index.php?strona=rejestracja">Zarejestruj się</a></p>';
+        echo '<p class="auth-hint">Nie masz konta? <a href="/rejestracja">Zarejestruj się</a></p>';
         echo '</div>';
         break;
     case 'rejestracja':
@@ -462,7 +514,7 @@ switch ($strona) {
                     // Hashing is handled inside the SQL function via pgcrypto crypt()
                     $stmt = $polaczenie->prepare('SELECT zarejestruj_uzytkownika(:nazwa, :haslo)');
                     $stmt->execute([':nazwa' => $nazwa_wpisana, ':haslo' => $haslo]);
-                    header('Location: index.php?strona=logowanie');
+                    header('Location: /logowanie');
                     exit;
                 } catch (PDOException $e) {
                     // The SQL function re-raises unique_violation as P0001 via RAISE EXCEPTION
@@ -675,7 +727,7 @@ switch ($strona) {
                 if ($rodzaj === 'link') {
                     $tytul     = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
                     echo '<span class="type-badge type-badge--link">L</span> ';
-                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $tytul . '</a>';
+                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $tytul . '</a>';
                     if (!empty($wpis['link'])) {
                         $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
                         if (in_array($link_schema, ['http', 'https'], true)) {
@@ -688,15 +740,15 @@ switch ($strona) {
                     }
                 } else {
                     $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
-                    echo '<a href="index.php?strona=wpis&amp;id=' . $id . '" class="card-title">' . $podglad . '</a>';
+                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $podglad . '</a>';
                 }
                 echo '<div class="card-meta">';
                 echo 'Autor: <strong>' . $autor . '</strong>';
                 echo '<span class="sep">|</span>';
                 echo 'Wynik: <span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
                 if (isset($_SESSION['uzytkownik_id'])) {
-                    echo ' <button type="button" class="btn-vote up" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-                    echo ' <button type="button" class="btn-vote down" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
+                    echo ' <button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
+                    echo ' <button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
                 }
                 echo '<span class="sep">|</span>';
                 echo 'Komentarze: <strong>' . $komentarze . '</strong>';
@@ -718,7 +770,7 @@ switch ($strona) {
             );
         }
         session_destroy();
-        header('Location: index.php?strona=logowanie');
+        header('Location: /logowanie');
         exit;
 }
 $tresc = ob_get_clean();
@@ -1056,21 +1108,21 @@ $tresc = ob_get_clean();
 </head>
 <body>
     <header>
-        <a class="nazwa-serwisu" href="index.php">Mirkovibe</a>
+        <a class="nazwa-serwisu" href="/">Mirkovibe</a>
         <nav>
-            <a href="index.php?strona=glowna">Główna</a>
+            <a href="/">Główna</a>
             <span class="nav-sep">|</span>
-            <a href="index.php?strona=dodaj">Dodaj wpis</a>
+            <a href="/dodaj">Dodaj wpis</a>
             <?php if (isset($_SESSION['uzytkownik_id'])): ?>
                 <span class="nav-sep">|</span>
                 <span class="nav-user">Witaj, <?= htmlspecialchars($_SESSION['uzytkownik_nazwa'], ENT_QUOTES, 'UTF-8') ?>!</span>
                 <span class="nav-sep">|</span>
-                <a href="index.php?strona=wyloguj">Wyloguj</a>
+                <a href="/wyloguj">Wyloguj</a>
             <?php else: ?>
                 <span class="nav-sep">|</span>
-                <a href="index.php?strona=logowanie">Logowanie</a>
+                <a href="/logowanie">Logowanie</a>
                 <span class="nav-sep">|</span>
-                <a href="index.php?strona=rejestracja">Rejestracja</a>
+                <a href="/rejestracja">Rejestracja</a>
             <?php endif; ?>
             <a class="nav-github" href="https://github.com/KalwiRemi/mirkovibe" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>

@@ -12,7 +12,7 @@ Nowi użytkownicy mogą założyć konto podając:
 
 Hasła są bezpiecznie haszowane w bazie danych przy użyciu algorytmu bcrypt (pgcrypto).
 
-**URL:** `index.php?strona=rejestracja`
+**URL:** `/rejestracja`
 
 ---
 
@@ -20,7 +20,7 @@ Hasła są bezpiecznie haszowane w bazie danych przy użyciu algorytmu bcrypt (p
 
 Zarejestrowani użytkownicy mogą się zalogować podając nazwę użytkownika i hasło. Po pomyślnym logowaniu sesja jest odświeżana w celu bezpieczeństwa.
 
-**URL:** `index.php?strona=logowanie`
+**URL:** `/logowanie`
 
 ---
 
@@ -28,7 +28,7 @@ Zarejestrowani użytkownicy mogą się zalogować podając nazwę użytkownika i
 
 Zalogowany użytkownik może się wylogować. Sesja jest w pełni niszczona po stronie serwera.
 
-**URL:** `index.php?strona=wyloguj`
+**URL:** `/wyloguj`
 
 ---
 
@@ -45,7 +45,7 @@ Strona główna wyświetla listę wszystkich wpisów posortowanych od najnowszyc
 
 Wpisy są stronicowane – na jednej stronie wyświetla się **10 wpisów**. Nawigacja między stronami odbywa się przez paginację.
 
-**URL:** `index.php?strona=glowna` (domyślna)
+**URL:** `/` (domyślna), kolejne strony: `/glowna/{numer}`
 
 ---
 
@@ -63,7 +63,7 @@ Link do zewnętrznej strony. Wymagane:
 - **URL** – wymagany (musi być adresem HTTP lub HTTPS).
 - **Tagi** – wymagane (np. `#technologia #muzyka`); przechowywane jako hashtagi.
 
-**URL:** `index.php?strona=dodaj`
+**URL:** `/dodaj`
 
 ---
 
@@ -84,7 +84,7 @@ Wspólne dla obu rodzajów:
 - Przyciski do głosowania (tylko dla zalogowanych użytkowników)
 - Sekcja komentarzy
 
-**URL:** `index.php?strona=wpis&id={id}`
+**URL:** `/wpis/{id}`
 
 ---
 
@@ -118,7 +118,7 @@ Użytkownicy mogą oznaczać wpisy i komentarze tagami, wpisując `#nazwatagu` w
 
 Strona tagu wyświetla wszystkie wpisy, których treść zawiera dany tag, posortowane od najnowszych. Prezentacja jest identyczna jak na stronie głównej (tytuł, autor, wynik, komentarze, data).
 
-**URL strony tagu:** `index.php?strona=tag&tag={nazwatagu}`
+**URL strony tagu:** `/tag/{nazwatagu}`
 
 ---
 
@@ -127,3 +127,4 @@ Strona tagu wyświetla wszystkie wpisy, których treść zawiera dany tag, posor
 - **PHP** – logika aplikacji (jeden plik: `index.php`)
 - **PostgreSQL** – baza danych (logika w bazie: funkcje, widoki)
 - **htmx** – dynamiczne akcje bez przeładowania strony
+- **Apache mod_rewrite** – przyjazne adresy URL (np. `/wpis/1` zamiast `index.php?strona=wpis&id=1`)
