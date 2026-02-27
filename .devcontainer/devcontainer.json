@@ -11,11 +11,6 @@
       "onAutoForward": "openBrowser"
     }
   },
-  "features": {
-    "ghcr.io/devcontainers/features/postgres:1": {
-      "version": "16"
-    }
-  },
   "remoteEnv": {
     "BAZA_HOST": "localhost",
     "BAZA_NAZWA": "mirkovibe",
@@ -33,5 +28,6 @@
   },
   "initializeCommand": "test -f .env || cp .env.example .env",
   "postCreateCommand": "bash .devcontainer/setup.sh",
-  "postStartCommand": "pkill -f 'php -S 0.0.0.0:8080' 2>/dev/null || true; php -S 0.0.0.0:8080 -t /workspaces/mirkovibe > /tmp/php-server.log 2>&1 &"
+  "postStartCommand": "bash .devcontainer/start-app.sh",
+  "postAttachCommand": "bash .devcontainer/start-app.sh"
 }
