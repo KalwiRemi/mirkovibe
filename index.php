@@ -120,8 +120,8 @@ switch ($strona) {
                 echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
                 echo 'Wynik: <span id="wynik-wpisu-' . $id . '"><strong>' . $wynik . '</strong></span>';
                 if (isset($_SESSION['uzytkownik_id'])) {
-                    echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
-                    echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+                    echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
+                    echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
                 }
                 echo ' &nbsp;|&nbsp; ';
                 echo 'Komentarze: <strong>' . $komentarze . '</strong> &nbsp;|&nbsp; ';
@@ -192,8 +192,8 @@ switch ($strona) {
         echo 'Autor: <strong>' . $autor . '</strong> &nbsp;|&nbsp; ';
         echo 'Wynik: <span id="wynik-wpisu-' . $wpis_id . '"><strong>' . $wynik . '</strong></span>';
         if (isset($_SESSION['uzytkownik_id'])) {
-            echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
-            echo ' <button hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
+            echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#e8f5e9;">+</button>';
+            echo ' <button type="button" hx-post="index.php?strona=glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw" style="cursor:pointer;padding:0 6px;border:1px solid #ccc;border-radius:3px;background:#ffebee;">−</button>';
         }
         echo ' &nbsp;|&nbsp; ';
         echo $data;
