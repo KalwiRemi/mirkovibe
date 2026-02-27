@@ -1,0 +1,30 @@
+name: Wdróż na produkcję
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Sprawdź czy migrate.sql się zmienił
+        id: migrate-check
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -qx "migrate.sql"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Uruchom migracje
+        if: steps.migrate-check.outputs.changed == 'true'
+        run: psql "${{ secrets.DATABASE_URL }}" --variable ON_ERROR_STOP=1 -f migrate.sql
