@@ -1,0 +1,81 @@
+name: Podgląd PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Utwórz branch bazy danych Neon
+        uses: neondatabase/create-branch-action@v5
+        id: neon-branch
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: pr-${{ github.event.pull_request.number }}
+
+      - name: Sprawdź czy migrate.sql się zmienił
+        id: migrate-check
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qx "migrate.sql"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Uruchom migracje
+        if: steps.migrate-check.outputs.changed == 'true'
+        run: psql "${{ steps.neon-branch.outputs.db_url_with_pooler }}" --variable ON_ERROR_STOP=1 -f migrate.sql
+
+      - name: Skonfiguruj flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Utwórz lub zaktualizuj aplikację preview na Fly.io
+        run: |
+          APP_NAME="mirkovibe-pr-${{ github.event.pull_request.number }}"
+          DB_URL="${{ steps.neon-branch.outputs.db_url_with_pooler }}"
+
+          { read -r DB_HOST; read -r DB_NAME; read -r DB_USER; read -r DB_PASS; } < <(python3 -c "import urllib.parse; u=urllib.parse.urlparse('$DB_URL'); print(u.hostname); print(u.path.lstrip('/')); print(u.username); print(u.password)")
+
+          echo "::add-mask::$DB_PASS"
+
+          if ! flyctl status --app "$APP_NAME" > /dev/null 2>&1; then
+            flyctl apps create "$APP_NAME"
+          fi
+
+          flyctl secrets set \
+            BAZA_HOST="$DB_HOST" \
+            BAZA_NAZWA="$DB_NAME" \
+            BAZA_UZYTKOWNIK="$DB_USER" \
+            BAZA_HASLO="$DB_PASS" \
+            --app "$APP_NAME"
+
+          flyctl deploy --app "$APP_NAME" --config fly.toml --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Znajdź istniejący komentarz
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Preview dostępny pod adresem
+
+      - name: Dodaj lub zaktualizuj komentarz z linkiem do preview
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            🚀 **Preview dostępny pod adresem:** https://mirkovibe-pr-${{ github.event.pull_request.number }}.fly.dev
+          edit-mode: replace
