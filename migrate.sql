@@ -50,6 +50,17 @@ $$;
 -- Migracja: dwa rodzaje wpisów (wpis i link)
 ALTER TABLE wpisy ADD COLUMN IF NOT EXISTS rodzaj TEXT NOT NULL DEFAULT 'wpis';
 
+-- Migracja: panel administratora
+ALTER TABLE uzytkownicy ADD COLUMN IF NOT EXISTS jest_adminem BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS konfiguracja (
+    klucz   TEXT PRIMARY KEY,
+    wartosc TEXT NOT NULL
+);
+
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('rejestracja_wlaczona', 'false')
+    ON CONFLICT (klucz) DO NOTHING;
+
 CREATE OR REPLACE VIEW wpisy_z_wynikiem AS
 SELECT
     w.id,

@@ -4,8 +4,16 @@ CREATE TABLE uzytkownicy (
     id               SERIAL PRIMARY KEY,
     nazwa            TEXT UNIQUE NOT NULL,
     haslo_hash       TEXT NOT NULL,
+    jest_adminem     BOOLEAN NOT NULL DEFAULT FALSE,
     data_rejestracji TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE TABLE konfiguracja (
+    klucz   TEXT PRIMARY KEY,
+    wartosc TEXT NOT NULL
+);
+
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('rejestracja_wlaczona', 'false');
 
 CREATE TABLE wpisy (
     id           SERIAL PRIMARY KEY,
