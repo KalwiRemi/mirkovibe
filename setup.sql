@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE uzytkownicy (
     id               SERIAL PRIMARY KEY,
     nazwa            TEXT UNIQUE NOT NULL,
@@ -33,3 +35,37 @@ CREATE TABLE glosy (
     UNIQUE (uzytkownik_id, wpis_id),
     UNIQUE (uzytkownik_id, komentarz_id)
 );
+
+CREATE VIEW wpisy_z_wynikiem AS
+SELECT
+    w.id,
+    w.tytul,
+    w.tresc,
+    w.link,
+    w.autor_id,
+    w.data_dodania,
+    COALESCE(SUM(g.wartosc), 0) AS wynik
+FROM wpisy w
+LEFT JOIN glosy g ON g.wpis_id = w.id
+GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania;
+
+CREATE FUNCTION dodaj_glos(p_uzytkownik_id INT, p_wpis_id INT, p_wartosc SMALLINT)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO glosy (uzytkownik_id, wpis_id, wartosc)
+    VALUES (p_uzytkownik_id, p_wpis_id, p_wartosc)
+    ON CONFLICT (uzytkownik_id, wpis_id)
+    DO UPDATE SET wartosc = EXCLUDED.wartosc;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION zarejestruj_uzytkownika(p_nazwa TEXT, p_haslo TEXT)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO uzytkownicy (nazwa, haslo_hash)
+    VALUES (p_nazwa, crypt(p_haslo, gen_salt('bf')));
+EXCEPTION
+    WHEN unique_violation THEN
+        RAISE EXCEPTION 'Użytkownik o nazwie "%" już istnieje.', p_nazwa;
+END;
+$$ LANGUAGE plpgsql;
