@@ -1,14 +1,21 @@
 {
   "name": "mirkovibe",
-  "dockerComposeFile": "../docker-compose.yml",
-  "service": "app",
-  "workspaceFolder": "/var/www/html",
-  "forwardPorts": [8080],
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspaces/mirkovibe",
+  "forwardPorts": [8080, 5432],
   "portsAttributes": {
     "8080": {
       "label": "Aplikacja (PHP)",
       "onAutoForward": "openBrowser"
     }
+  },
+  "remoteEnv": {
+    "BAZA_HOST": "localhost",
+    "BAZA_NAZWA": "mirkovibe",
+    "BAZA_UZYTKOWNIK": "mirkovibe",
+    "BAZA_HASLO": "mirkovibe"
   },
   "customizations": {
     "vscode": {
@@ -19,5 +26,8 @@
       ]
     }
   },
-  "remoteUser": "www-data"
+  "initializeCommand": "test -f .env || cp .env.example .env",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start-app.sh",
+  "postAttachCommand": "bash .devcontainer/start-app.sh"
 }
