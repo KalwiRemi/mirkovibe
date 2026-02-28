@@ -75,6 +75,16 @@ FROM wpisy w
 LEFT JOIN glosy g ON g.wpis_id = w.id
 GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj, w.usunieto;
 
+CREATE INDEX wpisy_autor_id_idx ON wpisy (autor_id);
+CREATE INDEX wpisy_data_dodania_idx ON wpisy (data_dodania DESC);
+
+CREATE INDEX komentarze_wpis_id_idx ON komentarze (wpis_id);
+CREATE INDEX komentarze_autor_id_idx ON komentarze (autor_id);
+CREATE INDEX komentarze_rodzic_id_idx ON komentarze (rodzic_id);
+
+CREATE INDEX glosy_wpis_id_idx ON glosy (wpis_id);
+CREATE INDEX glosy_komentarz_id_idx ON glosy (komentarz_id);
+
 CREATE FUNCTION dodaj_glos(p_uzytkownik_id INT, p_wpis_id INT, p_wartosc SMALLINT)
 RETURNS VOID AS $$
 BEGIN
