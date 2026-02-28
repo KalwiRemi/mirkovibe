@@ -63,11 +63,8 @@ function sprawdzKarencje(PDO $polaczenie, int $uzytkownik_id, string $typ): floa
 function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0): string {
     $html  = '<div id="komentarze-sekcja">';
     $html .= '<section class="comments-section">';
-    $html .= '<h2>Komentarze (' . count($komentarze) . ')</h2>';
 
-    if (empty($komentarze)) {
-        $html .= '<p class="empty-state">Brak komentarzy.</p>';
-    } else {
+    if (!empty($komentarze)) {
         $html .= '<ul class="comment-list">';
         foreach ($komentarze as $komentarz) {
             $k_id    = (int)$komentarz['id'];
@@ -76,16 +73,28 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
             $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
             $k_wynik = (int)($komentarz['wynik'] ?? 0);
             $html .= '<li class="comment-item">';
-            $html .= '<div class="comment-meta">';
-            $html .= '<strong>' . $k_autor . '</strong>';
-            $html .= '<span class="sep">|</span>' . $k_data;
-            $html .= '<span class="sep">|</span> Wynik: <span id="wynik-komentarza-' . $k_id . '" class="score">' . $k_wynik . '</span>';
+            $html .= '<div class="card-layout">';
+            $html .= '<div class="card-votes">';
             if ($zalogowany) {
-                $html .= ' <button type="button" class="btn-vote up" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-                $html .= ' <button type="button" class="btn-vote down" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
+                $html .= '<button type="button" class="btn-vote up" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
+            } else {
+                $html .= '<span class="vote-icon">▲</span>';
+            }
+            $html .= '<span id="wynik-komentarza-' . $k_id . '" class="score">' . $k_wynik . '</span>';
+            if ($zalogowany) {
+                $html .= '<button type="button" class="btn-vote down" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
+            } else {
+                $html .= '<span class="vote-icon">▼</span>';
             }
             $html .= '</div>';
-            $html .= '<div>' . nl2br(parsujTagi($k_tresc)) . '</div>';
+            $html .= '<div class="card-content">';
+            $html .= '<div class="card-header">';
+            $html .= '<strong class="card-author">' . $k_autor . '</strong>';
+            $html .= '<span class="card-date">' . $k_data . '</span>';
+            $html .= '</div>';
+            $html .= '<div class="card-body">' . nl2br(parsujTagi($k_tresc)) . '</div>';
+            $html .= '</div>';
+            $html .= '</div>';
             $html .= '</li>';
         }
         $html .= '</ul>';
@@ -1240,30 +1249,20 @@ $tresc = ob_get_clean();
         }
 
         /* ── Comments ── */
-        .comments-section { margin-top: 1.5rem; }
+        .comments-section { margin-top: 0.5rem; }
 
         .comment-list {
             list-style: none;
-            border-top: 1px solid #ccc;
-            margin-top: 0.5rem;
+            border-top: 1px solid #e8e8e8;
         }
 
         .comment-item {
             border-bottom: 1px solid #e8e8e8;
             padding: 8px 4px;
+            padding-left: 1.5rem;
+            border-left: 2px solid #e0e0e0;
+            margin-left: 16px;
         }
-
-        .comment-meta {
-            font-size: 0.78rem;
-            color: #555;
-            margin-bottom: 4px;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0 0.3rem;
-        }
-
-        .comment-meta strong { color: #000; font-weight: bold; }
 
         /* ── Forms ── */
         .form-stack {
