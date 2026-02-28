@@ -60,7 +60,66 @@ function sprawdzKarencje(PDO $polaczenie, int $uzytkownik_id, string $typ): floa
     }
 }
 
-function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0): string {
+function pobierzGlosyWpisow(PDO $polaczenie, int $uzytkownik_id, array $wpisy): array {
+    if (empty($wpisy)) return [];
+    $ids = array_column($wpisy, 'id');
+    $miejsca = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $stmt = $polaczenie->prepare("SELECT wpis_id, wartosc FROM glosy WHERE uzytkownik_id = ? AND wpis_id IN ($miejsca)");
+        $stmt->execute(array_merge([$uzytkownik_id], $ids));
+        $wynik = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $g) {
+            $wynik[(int)$g['wpis_id']] = (int)$g['wartosc'];
+        }
+        return $wynik;
+    } catch (PDOException $e) {
+        error_log('Błąd pobierania głosów wpisów: ' . $e->getMessage());
+        return [];
+    }
+}
+
+function pobierzGlosyKomentarzy(PDO $polaczenie, int $uzytkownik_id, array $komentarze): array {
+    if (empty($komentarze)) return [];
+    $ids = array_column($komentarze, 'id');
+    $miejsca = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $stmt = $polaczenie->prepare("SELECT komentarz_id, wartosc FROM glosy WHERE uzytkownik_id = ? AND komentarz_id IN ($miejsca)");
+        $stmt->execute(array_merge([$uzytkownik_id], $ids));
+        $wynik = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $g) {
+            $wynik[(int)$g['komentarz_id']] = (int)$g['wartosc'];
+        }
+        return $wynik;
+    } catch (PDOException $e) {
+        error_log('Błąd pobierania głosów komentarzy: ' . $e->getMessage());
+        return [];
+    }
+}
+
+function renderujSekcjeGlosow(string $typ, int $id, int $wynik, bool $zalogowany, int $glos_uzytkownika = 0): string {
+    $trasa     = $typ === 'wpis' ? '/glosuj' : '/glosuj_komentarz';
+    $pole_id   = $typ === 'wpis' ? 'wpis_id' : 'komentarz_id';
+    $id_sekcji = 'glosy-' . $typ . '-' . $id;
+    $id_wyniku = 'wynik-' . $typ . '-' . $id;
+    $html  = '<div id="' . $id_sekcji . '" class="card-votes">';
+    if ($zalogowany) {
+        $klasa_up = 'btn-vote up' . ($glos_uzytkownika === 1 ? ' active' : '');
+        $html .= '<button type="button" class="' . $klasa_up . '" hx-post="' . $trasa . '" hx-target="#' . $id_sekcji . '" hx-swap="outerHTML" hx-vals=\'{"' . $pole_id . '":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
+    } else {
+        $html .= '<span class="vote-icon">▲</span>';
+    }
+    $html .= '<span id="' . $id_wyniku . '" class="score">' . $wynik . '</span>';
+    if ($zalogowany) {
+        $klasa_down = 'btn-vote down' . ($glos_uzytkownika === -1 ? ' active' : '');
+        $html .= '<button type="button" class="' . $klasa_down . '" hx-post="' . $trasa . '" hx-target="#' . $id_sekcji . '" hx-swap="outerHTML" hx-vals=\'{"' . $pole_id . '":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
+    } else {
+        $html .= '<span class="vote-icon">▼</span>';
+    }
+    $html .= '</div>';
+    return $html;
+}
+
+function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0, array $glosy_uzytkownika = []): string {
     $html  = '<div id="komentarze-sekcja">';
     $html .= '<section class="comments-section">';
 
@@ -74,19 +133,8 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
             $k_wynik = (int)($komentarz['wynik'] ?? 0);
             $html .= '<li class="comment-item">';
             $html .= '<div class="card-layout">';
-            $html .= '<div class="card-votes">';
-            if ($zalogowany) {
-                $html .= '<button type="button" class="btn-vote up" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
-            } else {
-                $html .= '<span class="vote-icon">▲</span>';
-            }
-            $html .= '<span id="wynik-komentarza-' . $k_id . '" class="score">' . $k_wynik . '</span>';
-            if ($zalogowany) {
-                $html .= '<button type="button" class="btn-vote down" hx-post="/glosuj_komentarz" hx-target="#wynik-komentarza-' . $k_id . '" hx-swap="innerHTML" hx-vals=\'{"komentarz_id":"' . $k_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
-            } else {
-                $html .= '<span class="vote-icon">▼</span>';
-            }
-            $html .= '</div>';
+            $k_glos = (int)($glosy_uzytkownika[$k_id] ?? 0);
+            $html .= renderujSekcjeGlosow('komentarz', $k_id, $k_wynik, $zalogowany, $k_glos);
             $html .= '<div class="card-content">';
             $html .= '<div class="card-header">';
             $html .= '<strong class="card-author">' . $k_autor . '</strong>';
@@ -120,7 +168,7 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     $html .= '</div>';
     return $html;
 }
-function renderujKarteWpisu(array $wpis, bool $zalogowany): string {
+function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika = 0): string {
     $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
     $autor      = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
     $wynik      = (int)$wpis['wynik'];
@@ -131,19 +179,7 @@ function renderujKarteWpisu(array $wpis, bool $zalogowany): string {
     $html  = '<li class="card">';
     $html .= '<div class="card-layout">';
 
-    $html .= '<div class="card-votes">';
-    if ($zalogowany) {
-        $html .= '<button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
-    } else {
-        $html .= '<span class="vote-icon">▲</span>';
-    }
-    $html .= '<span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
-    if ($zalogowany) {
-        $html .= '<button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
-    } else {
-        $html .= '<span class="vote-icon">▼</span>';
-    }
-    $html .= '</div>';
+    $html .= renderujSekcjeGlosow('wpis', $id, $wynik, $zalogowany, $glos_uzytkownika);
 
     $html .= '<div class="card-content">';
     $html .= '<div class="card-header">';
@@ -289,6 +325,10 @@ switch ($strona) {
 
         $liczba_stron = (int)ceil($liczba_wpisow / $wpisow_na_strone);
 
+        $glosy_uzytkownika_wpisy = isset($_SESSION['uzytkownik_id'])
+            ? pobierzGlosyWpisow($polaczenie, (int)$_SESSION['uzytkownik_id'], $wpisy)
+            : [];
+
         echo '<h1>Lista wpisów</h1>';
 
         if (empty($wpisy)) {
@@ -296,7 +336,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']));
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0);
             }
             echo '</ul>';
         }
@@ -347,21 +387,20 @@ switch ($strona) {
         $liczba_komentarzy = (int)($wpis['liczba_komentarzy'] ?? 0);
         $zalogowany_wpis   = isset($_SESSION['uzytkownik_id']);
 
+        $glos_wpisu = 0;
+        if ($zalogowany_wpis) {
+            try {
+                $stmt_gw = $polaczenie->prepare('SELECT wartosc FROM glosy WHERE uzytkownik_id = :u AND wpis_id = :w');
+                $stmt_gw->execute([':u' => $_SESSION['uzytkownik_id'], ':w' => $wpis_id]);
+                $glos_wpisu = (int)($stmt_gw->fetchColumn() ?: 0);
+            } catch (PDOException $e) {
+                error_log('Błąd pobierania głosu użytkownika: ' . $e->getMessage());
+            }
+        }
+
         echo '<div class="card card-layout card-layout--detail">';
 
-        echo '<div class="card-votes">';
-        if ($zalogowany_wpis) {
-            echo '<button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
-        } else {
-            echo '<span class="vote-icon">▲</span>';
-        }
-        echo '<span id="wynik-wpisu-' . $wpis_id . '" class="score">' . $wynik . '</span>';
-        if ($zalogowany_wpis) {
-            echo '<button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
-        } else {
-            echo '<span class="vote-icon">▼</span>';
-        }
-        echo '</div>';
+        echo renderujSekcjeGlosow('wpis', $wpis_id, $wynik, $zalogowany_wpis, $glos_wpisu);
 
         echo '<div class="card-content">';
         echo '<div class="card-header">';
@@ -417,11 +456,16 @@ switch ($strona) {
             $komentarze = [];
         }
 
+        $glosy_komentarzy = isset($_SESSION['uzytkownik_id'])
+            ? pobierzGlosyKomentarzy($polaczenie, (int)$_SESSION['uzytkownik_id'], $komentarze)
+            : [];
+
         echo renderujKomentarze($komentarze, $wpis_id, isset($_SESSION['uzytkownik_id']),
             '',
             (isset($_SESSION['uzytkownik_id']) && empty($_SESSION['jest_adminem']))
                 ? sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')
-                : 0.0
+                : 0.0,
+            $glosy_komentarzy
         );
         break;
     case 'dodaj':
@@ -796,7 +840,9 @@ switch ($strona) {
             $komentarze = [];
         }
 
-        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza, $godziny_oczekiwania_komentarz);
+        $glosy_komentarzy = pobierzGlosyKomentarzy($polaczenie, (int)$_SESSION['uzytkownik_id'], $komentarze);
+
+        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza, $godziny_oczekiwania_komentarz, $glosy_komentarzy);
         exit;
     case 'glosuj':
         ob_end_clean();
@@ -830,7 +876,11 @@ switch ($strona) {
                 exit;
             }
 
-            echo '<strong>' . (int)$wynik_raw . '</strong>';
+            $stmt_glos = $polaczenie->prepare('SELECT wartosc FROM glosy WHERE uzytkownik_id = :u AND wpis_id = :w');
+            $stmt_glos->execute([':u' => $_SESSION['uzytkownik_id'], ':w' => $wpis_id]);
+            $glos_aktualny = (int)($stmt_glos->fetchColumn() ?: 0);
+
+            echo renderujSekcjeGlosow('wpis', $wpis_id, (int)$wynik_raw, true, $glos_aktualny);
         } catch (PDOException $e) {
             error_log('Błąd głosowania: ' . $e->getMessage());
             http_response_code(500);
@@ -867,7 +917,11 @@ switch ($strona) {
             $stmt2->execute();
             $wynik_raw = $stmt2->fetchColumn();
 
-            echo '<strong>' . (int)$wynik_raw . '</strong>';
+            $stmt_glos = $polaczenie->prepare('SELECT wartosc FROM glosy WHERE uzytkownik_id = :u AND komentarz_id = :k');
+            $stmt_glos->execute([':u' => $_SESSION['uzytkownik_id'], ':k' => $komentarz_id]);
+            $glos_aktualny = (int)($stmt_glos->fetchColumn() ?: 0);
+
+            echo renderujSekcjeGlosow('komentarz', $komentarz_id, (int)$wynik_raw, true, $glos_aktualny);
         } catch (PDOException $e) {
             error_log('Błąd głosowania na komentarz: ' . $e->getMessage());
             http_response_code(500);
@@ -901,6 +955,10 @@ switch ($strona) {
             $wpisy = [];
         }
 
+        $glosy_uzytkownika_wpisy = isset($_SESSION['uzytkownik_id'])
+            ? pobierzGlosyWpisow($polaczenie, (int)$_SESSION['uzytkownik_id'], $wpisy)
+            : [];
+
         echo '<h1>Wpisy z tagiem #' . $tag_wyswietlany . '</h1>';
 
         if (empty($wpisy)) {
@@ -908,7 +966,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']));
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0);
             }
             echo '</ul>';
         }
@@ -1233,6 +1291,7 @@ $tresc = ob_get_clean();
         }
 
         .btn-vote:hover { color: #000; }
+        .btn-vote.active { color: #000; }
 
         /* ── Article (single post) ── */
         .article-body {
