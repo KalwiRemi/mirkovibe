@@ -4,8 +4,7 @@ RUN apt-get update && apt-get install -y libpq-dev msmtp \
     && docker-php-ext-install pdo pdo_pgsql \
     && rm -rf /var/lib/apt/lists/* \
     && a2enmod rewrite \
-    && sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf \
-    && echo 'sendmail_path = "/usr/bin/msmtp -t --read-envelope-from"' > /usr/local/etc/php/conf.d/mail.ini
+    && sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
 WORKDIR /var/www/html
 
