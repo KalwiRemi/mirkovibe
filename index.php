@@ -562,7 +562,7 @@ switch ($strona) {
                         $stmt_admin = $polaczenie->prepare('UPDATE uzytkownicy SET jest_adminem = TRUE, email = :email, email_zweryfikowany = TRUE WHERE nazwa = :nazwa');
                         $stmt_admin->execute([':email' => $email_wpisany, ':nazwa' => $nazwa_wpisana]);
                     } else {
-                        $stmt_email = $polaczenie->prepare('UPDATE uzytkownicy SET email = :email WHERE nazwa = :nazwa');
+                        $stmt_email = $polaczenie->prepare('UPDATE uzytkownicy SET email = :email, email_zweryfikowany = FALSE WHERE nazwa = :nazwa');
                         $stmt_email->execute([':email' => $email_wpisany, ':nazwa' => $nazwa_wpisana]);
 
                         $token = bin2hex(random_bytes(32));
