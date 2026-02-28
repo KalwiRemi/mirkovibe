@@ -1,11 +1,13 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE uzytkownicy (
-    id               SERIAL PRIMARY KEY,
-    nazwa            TEXT UNIQUE NOT NULL,
-    haslo_hash       TEXT NOT NULL,
-    jest_adminem     BOOLEAN NOT NULL DEFAULT FALSE,
-    data_rejestracji TIMESTAMPTZ DEFAULT NOW()
+    id                   SERIAL PRIMARY KEY,
+    nazwa                TEXT UNIQUE NOT NULL,
+    haslo_hash           TEXT NOT NULL,
+    email                TEXT UNIQUE,
+    email_zweryfikowany  BOOLEAN NOT NULL DEFAULT FALSE,
+    jest_adminem         BOOLEAN NOT NULL DEFAULT FALSE,
+    data_rejestracji     TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE konfiguracja (
@@ -35,6 +37,13 @@ CREATE TABLE komentarze (
     tresc        TEXT NOT NULL,
     data_dodania TIMESTAMPTZ DEFAULT NOW(),
     wynik        INT DEFAULT 0
+);
+
+CREATE TABLE tokeny_weryfikacji (
+    id               SERIAL PRIMARY KEY,
+    token            TEXT UNIQUE NOT NULL,
+    uzytkownik_id    INT REFERENCES uzytkownicy(id) ON DELETE CASCADE,
+    data_wygasniecia TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE glosy (

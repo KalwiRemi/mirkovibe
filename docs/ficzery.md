@@ -8,13 +8,26 @@ Mirkovibe to prosta alternatywa dla Wykopu i Reddita. Poniżej opisano wszystkie
 
 Nowi użytkownicy mogą założyć konto podając:
 - **Nazwę użytkownika** – co najmniej 3 znaki, unikalna w systemie.
+- **Adres email** – wymagany, unikalny w systemie; służy do weryfikacji konta.
 - **Hasło** – co najmniej 6 znaków (wpisywane dwukrotnie w celu potwierdzenia).
 
 Hasła są bezpiecznie haszowane w bazie danych przy użyciu algorytmu bcrypt (pgcrypto).
 
-Domyślnie rejestracja jest **wyłączona**. Gdy jest wyłączona, użytkownicy wchodzący na stronę rejestracji widzą komunikat „Rejestracja wyłączona" i nie mogą założyć konta. Wyjątkiem jest użytkownik o loginie zgodnym ze zmienną środowiskową `NAZWA_ADMINISTRATORA` – taki użytkownik może zarejestrować się zawsze i po rejestracji automatycznie otrzymuje uprawnienia administratora.
+Po rejestracji na podany adres email wysyłany jest link weryfikacyjny ważny przez 24 godziny. Konto jest nieaktywne do momentu kliknięcia linku. Zalogowanie się przed weryfikacją jest niemożliwe.
+
+Domyślnie rejestracja jest **wyłączona**. Gdy jest wyłączona, użytkownicy wchodzący na stronę rejestracji widzą komunikat „Rejestracja wyłączona" i nie mogą założyć konta. Wyjątkiem jest użytkownik o loginie zgodnym ze zmienną środowiskową `NAZWA_ADMINISTRATORA` – taki użytkownik może zarejestrować się zawsze i po rejestracji automatycznie otrzymuje uprawnienia administratora oraz ma konto od razu aktywne (bez konieczności weryfikacji email).
+
+Zmienna środowiskowa `APP_URL` określa bazowy adres URL serwisu używany do generowania linków weryfikacyjnych (np. `https://example.com`). Jeśli nie jest ustawiona, adres jest wyznaczany automatycznie na podstawie nagłówka HTTP.
 
 **URL:** `/rejestracja`
+
+---
+
+## 1a. Weryfikacja adresu email
+
+Po kliknięciu linku weryfikacyjnego wysłanego podczas rejestracji, serwis weryfikuje token i aktywuje konto użytkownika. Token jest jednorazowy i wygasa po 24 godzinach. Po pomyślnej weryfikacji użytkownik może się zalogować.
+
+**URL:** `/weryfikuj_email?token={token}`
 
 ---
 

@@ -6,6 +6,9 @@ define('BAZA_HOST',            getenv('BAZA_HOST')            ?: 'localhost');
 define('BAZA_NAZWA',           getenv('BAZA_NAZWA')           ?: 'mirkovibe');
 define('BAZA_UZYTKOWNIK',      getenv('BAZA_UZYTKOWNIK')      ?: 'postgres');
 define('BAZA_HASLO',           getenv('BAZA_HASLO')           ?: '');
+define('APP_URL', rtrim(getenv('APP_URL') ?:
+    ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'),
+    '/'));
 define('NAZWA_ADMINISTRATORA', getenv('NAZWA_ADMINISTRATORA') ?: '');
 define('DOMYSLNY_CZAS_WPISU',       12);
 define('DOMYSLNY_CZAS_KOMENTARZA',   1);
@@ -24,7 +27,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin', 'weryfikuj_email'];
 
 function formatujCzasOczekiwania(float $godziny): string {
     if ($godziny < 1) {
@@ -164,6 +167,9 @@ if (!isset($_GET['strona'])) {
             break;
         case 'admin':
             $_GET['strona'] = 'admin';
+            break;
+        case 'weryfikuj_email':
+            $_GET['strona'] = 'weryfikuj_email';
             break;
         default:
             $_GET['strona'] = 'glowna';
@@ -509,17 +515,21 @@ switch ($strona) {
 
             if (empty($bledy)) {
                 try {
-                    $stmt = $polaczenie->prepare('SELECT id, nazwa, haslo_hash, jest_adminem FROM uzytkownicy WHERE nazwa = :nazwa');
+                    $stmt = $polaczenie->prepare('SELECT id, nazwa, haslo_hash, jest_adminem, email, email_zweryfikowany FROM uzytkownicy WHERE nazwa = :nazwa');
                     $stmt->execute([':nazwa' => $nazwa_wpisana]);
                     $uzytkownik = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     if ($uzytkownik && password_verify($haslo, $uzytkownik['haslo_hash'])) {
-                        session_regenerate_id(true);
-                        $_SESSION['uzytkownik_id']    = $uzytkownik['id'];
-                        $_SESSION['uzytkownik_nazwa'] = $uzytkownik['nazwa'];
-                        $_SESSION['jest_adminem']     = (bool)$uzytkownik['jest_adminem'];
-                        header('Location: /');
-                        exit;
+                        if ($uzytkownik['email'] !== null && !$uzytkownik['email_zweryfikowany']) {
+                            $bledy[] = 'Twój adres email nie został jeszcze zweryfikowany. Sprawdź swoją skrzynkę pocztową.';
+                        } else {
+                            session_regenerate_id(true);
+                            $_SESSION['uzytkownik_id']    = $uzytkownik['id'];
+                            $_SESSION['uzytkownik_nazwa'] = $uzytkownik['nazwa'];
+                            $_SESSION['jest_adminem']     = (bool)$uzytkownik['jest_adminem'];
+                            header('Location: /');
+                            exit;
+                        }
                     } else {
                         $bledy[] = 'Nieprawidłowa nazwa użytkownika lub hasło.';
                     }
@@ -549,6 +559,7 @@ switch ($strona) {
     case 'rejestracja':
         $bledy = [];
         $nazwa_wpisana = '';
+        $email_wpisany = '';
 
         $rejestracja_wlaczona = false;
         try {
@@ -575,6 +586,7 @@ switch ($strona) {
             $nazwa_wpisana = trim($_POST['nazwa'] ?? '');
             $haslo         = $_POST['haslo']  ?? '';
             $haslo2        = $_POST['haslo2'] ?? '';
+            $email_wpisany = trim($_POST['email'] ?? '');
 
             if (strlen($nazwa_wpisana) < 3) {
                 $bledy[] = 'Nazwa użytkownika musi mieć co najmniej 3 znaki.';
@@ -585,22 +597,62 @@ switch ($strona) {
             if ($haslo !== $haslo2) {
                 $bledy[] = 'Hasła nie są zgodne.';
             }
+            if (!filter_var($email_wpisany, FILTER_VALIDATE_EMAIL)) {
+                $bledy[] = 'Podaj prawidłowy adres email.';
+            }
 
             if (empty($bledy)) {
                 try {
-                    // Hashing is handled inside the SQL function via pgcrypto crypt()
+                    $polaczenie->beginTransaction();
+
                     $stmt = $polaczenie->prepare('SELECT zarejestruj_uzytkownika(:nazwa, :haslo)');
                     $stmt->execute([':nazwa' => $nazwa_wpisana, ':haslo' => $haslo]);
-                    if (NAZWA_ADMINISTRATORA !== '' && $nazwa_wpisana === NAZWA_ADMINISTRATORA) {
-                        $stmt_admin = $polaczenie->prepare('UPDATE uzytkownicy SET jest_adminem = TRUE WHERE nazwa = :nazwa');
-                        $stmt_admin->execute([':nazwa' => $nazwa_wpisana]);
+
+                    $jest_adminem = NAZWA_ADMINISTRATORA !== '' && $nazwa_wpisana === NAZWA_ADMINISTRATORA;
+                    if ($jest_adminem) {
+                        $stmt_admin = $polaczenie->prepare('UPDATE uzytkownicy SET jest_adminem = TRUE, email = :email, email_zweryfikowany = TRUE WHERE nazwa = :nazwa');
+                        $stmt_admin->execute([':email' => $email_wpisany, ':nazwa' => $nazwa_wpisana]);
+                    } else {
+                        $stmt_email = $polaczenie->prepare('UPDATE uzytkownicy SET email = :email, email_zweryfikowany = FALSE WHERE nazwa = :nazwa');
+                        $stmt_email->execute([':email' => $email_wpisany, ':nazwa' => $nazwa_wpisana]);
+
+                        $token = bin2hex(random_bytes(32));
+                        $stmt_token = $polaczenie->prepare(
+                            'INSERT INTO tokeny_weryfikacji (token, uzytkownik_id, data_wygasniecia)
+                             SELECT :token, id, NOW() + INTERVAL \'24 hours\' FROM uzytkownicy WHERE nazwa = :nazwa'
+                        );
+                        $stmt_token->execute([':token' => $token, ':nazwa' => $nazwa_wpisana]);
                     }
+
+                    $polaczenie->commit();
+
+                    if (!$jest_adminem) {
+                        $link_weryfikacji = APP_URL . '/weryfikuj_email?token=' . urlencode($token);
+                        $temat = 'Weryfikacja adresu email - Mirkovibe';
+                        $tresc_email = "Witaj, " . $nazwa_wpisana . "!\n\n"
+                            . "Kliknij poniższy link, aby zweryfikować swój adres email:\n\n"
+                            . $link_weryfikacji . "\n\n"
+                            . "Link jest ważny przez 24 godziny.\n\n"
+                            . "Jeśli nie zakładałeś/aś konta w serwisie Mirkovibe, zignoruj tę wiadomość.";
+                        $naglowki = 'From: ' . (getenv('SMTP_FROM') ?: 'noreply@' . (parse_url(APP_URL, PHP_URL_HOST) ?? 'mirkovibe')) . "\r\n"
+                            . 'Content-Type: text/plain; charset=UTF-8' . "\r\n";
+                        $wyslano = mail($email_wpisany, $temat, $tresc_email, $naglowki);
+                        if (!$wyslano) {
+                            error_log('Nie udało się wysłać emaila weryfikacyjnego do: ' . $email_wpisany);
+                        }
+                        echo '<h1>Rejestracja</h1>';
+                        echo '<p>Konto zostało utworzone. Na adres <strong>' . htmlspecialchars($email_wpisany, ENT_QUOTES, 'UTF-8') . '</strong> wysłaliśmy link weryfikacyjny. Sprawdź swoją skrzynkę pocztową (w tym folder spam) i kliknij link, aby aktywować konto.</p>';
+                        break;
+                    }
+
                     header('Location: /logowanie');
                     exit;
                 } catch (PDOException $e) {
-                    // The SQL function re-raises unique_violation as P0001 via RAISE EXCEPTION
+                    if ($polaczenie->inTransaction()) {
+                        $polaczenie->rollBack();
+                    }
                     if ($e->getCode() === '23505' || $e->getCode() === 'P0001') {
-                        $bledy[] = 'Użytkownik o podanej nazwie już istnieje.';
+                        $bledy[] = 'Użytkownik o podanej nazwie lub adresie email już istnieje.';
                     } else {
                         error_log('Błąd rejestracji: ' . $e->getMessage());
                         $bledy[] = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.';
@@ -619,6 +671,7 @@ switch ($strona) {
         }
         echo '<div class="auth-wrap"><form method="post" class="form-stack">';
         echo '<input type="text" name="nazwa" placeholder="Nazwa użytkownika" value="' . htmlspecialchars($nazwa_wpisana, ENT_QUOTES, 'UTF-8') . '" required>';
+        echo '<input type="email" name="email" placeholder="Adres email" value="' . htmlspecialchars($email_wpisany, ENT_QUOTES, 'UTF-8') . '" required>';
         echo '<input type="password" name="haslo" placeholder="Hasło (min. 6 znaków)" required>';
         echo '<input type="password" name="haslo2" placeholder="Powtórz hasło" required>';
         echo '<button type="submit" class="btn-primary">Zarejestruj się</button>';
@@ -923,6 +976,56 @@ switch ($strona) {
         session_destroy();
         header('Location: /logowanie');
         exit;
+    case 'weryfikuj_email':
+        $token_wpisany = trim($_GET['token'] ?? '');
+        if ($token_wpisany === '') {
+            echo '<h1>Weryfikacja email</h1>';
+            echo '<p>Nieprawidłowy lub brakujący token weryfikacyjny.</p>';
+            break;
+        }
+        try {
+            $stmt_tok = $polaczenie->prepare(
+                'SELECT t.id, t.uzytkownik_id, t.data_wygasniecia, u.email_zweryfikowany
+                 FROM tokeny_weryfikacji t
+                 JOIN uzytkownicy u ON u.id = t.uzytkownik_id
+                 WHERE t.token = :token'
+            );
+            $stmt_tok->execute([':token' => $token_wpisany]);
+            $wiersz_tokenu = $stmt_tok->fetch(PDO::FETCH_ASSOC);
+
+            if (!$wiersz_tokenu) {
+                echo '<h1>Weryfikacja email</h1>';
+                echo '<p>Nieprawidłowy lub nieistniejący link weryfikacyjny.</p>';
+                break;
+            }
+
+            if ($wiersz_tokenu['email_zweryfikowany']) {
+                echo '<h1>Weryfikacja email</h1>';
+                echo '<p>Adres email został już wcześniej zweryfikowany. Możesz się <a href="/logowanie">zalogować</a>.</p>';
+                break;
+            }
+
+            if (new DateTime('now') > new DateTime($wiersz_tokenu['data_wygasniecia'])) {
+                $stmt_del = $polaczenie->prepare('DELETE FROM tokeny_weryfikacji WHERE id = :id');
+                $stmt_del->execute([':id' => $wiersz_tokenu['id']]);
+                echo '<h1>Weryfikacja email</h1>';
+                echo '<p>Link weryfikacyjny wygasł. Skontaktuj się z administratorem serwisu.</p>';
+                break;
+            }
+
+            $stmt_ver = $polaczenie->prepare('UPDATE uzytkownicy SET email_zweryfikowany = TRUE WHERE id = :id');
+            $stmt_ver->execute([':id' => $wiersz_tokenu['uzytkownik_id']]);
+            $stmt_del2 = $polaczenie->prepare('DELETE FROM tokeny_weryfikacji WHERE id = :id');
+            $stmt_del2->execute([':id' => $wiersz_tokenu['id']]);
+
+            echo '<h1>Weryfikacja email</h1>';
+            echo '<p>Adres email został pomyślnie zweryfikowany. Możesz się teraz <a href="/logowanie">zalogować</a>.</p>';
+        } catch (PDOException $e) {
+            error_log('Błąd weryfikacji email: ' . $e->getMessage());
+            echo '<h1>Weryfikacja email</h1>';
+            echo '<p>Wystąpił błąd podczas weryfikacji. Spróbuj ponownie.</p>';
+        }
+        break;
 }
 $tresc = ob_get_clean();
 

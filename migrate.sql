@@ -80,3 +80,16 @@ SELECT
 FROM wpisy w
 LEFT JOIN glosy g ON g.wpis_id = w.id
 GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj;
+
+-- Migracja: weryfikacja email podczas rejestracji
+ALTER TABLE uzytkownicy ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE uzytkownicy ADD COLUMN IF NOT EXISTS email_zweryfikowany BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE uzytkownicy ALTER COLUMN email_zweryfikowany SET DEFAULT FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS uzytkownicy_email_uniq ON uzytkownicy (email) WHERE email IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS tokeny_weryfikacji (
+    id               SERIAL PRIMARY KEY,
+    token            TEXT UNIQUE NOT NULL,
+    uzytkownik_id    INT REFERENCES uzytkownicy(id) ON DELETE CASCADE,
+    data_wygasniecia TIMESTAMPTZ NOT NULL
+);
