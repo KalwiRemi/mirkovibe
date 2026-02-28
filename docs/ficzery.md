@@ -49,14 +49,12 @@ Zalogowany użytkownik może się wylogować. Sesja jest w pełni niszczona po s
 
 ## 4. Lista wpisów (strona główna)
 
-Strona główna wyświetla listę wszystkich wpisów posortowanych od najnowszych. Każdy wpis na liście pokazuje:
-- Dla **wpisu**: fragment treści (do 120 znaków) jako link do strony wpisu
-- Dla **linku**: oznaczenie `L`, tytuł jako link do strony wpisu oraz domenę zewnętrznego URL
-- Autora
-- Aktualny wynik głosowania
-- Przyciski do głosowania (tylko dla zalogowanych użytkowników)
-- Liczbę komentarzy
-- Datę dodania
+Strona główna wyświetla listę wszystkich wpisów posortowanych od najnowszych. Każdy wpis prezentowany jest w dwukolumnowym układzie:
+- **Lewa kolumna:** przyciski głosowania (▲ / ▼) z aktualnym wynikiem pośrodku (przyciski aktywne tylko dla zalogowanych użytkowników; ikony statyczne dla niezalogowanych)
+- **Prawa kolumna:**
+  - Nagłówek: autor i data dodania
+  - Treść: dla **wpisu** – fragment treści (do 120 znaków) jako link; dla **linku** – oznaczenie `L`, tytuł jako link oraz domena zewnętrznego URL
+  - Stopka: „komentarze (N)" (link do strony wpisu) oraz „odpowiedz" (link do strony wpisu)
 
 Wpisy są stronicowane – na jednej stronie wyświetla się **10 wpisów**. Nawigacja między stronami odbywa się przez paginację.
 
@@ -86,10 +84,15 @@ Link do zewnętrznej strony. Wymagane:
 
 ## 6. Strona wpisu
 
-Każdy wpis ma własną stronę. Wyświetlana zawartość zależy od rodzaju wpisu:
+Każdy wpis ma własną stronę prezentowaną w zunifikowanym dwukolumnowym układzie (identycznym jak na liście wpisów), bez dodatkowego obramowania ani tła:
+- **Lewa kolumna:** przyciski głosowania (▲ / ▼) z aktualnym wynikiem
+- **Prawa kolumna:**
+  - Nagłówek: autor i data dodania
+  - Pełna treść wpisu lub tytuł/URL/tagi linku
+  - Stopka: „komentarze (N)" i „odpowiedz" (oba linki przewijają do sekcji komentarzy)
 
 **Wpis:**
-- Treść wpisu
+- Pełna treść wpisu
 
 **Link:**
 - Tytuł wpisu (z oznaczeniem `L`)
@@ -97,9 +100,8 @@ Każdy wpis ma własną stronę. Wyświetlana zawartość zależy od rodzaju wpi
 - Tagi powiązane z linkiem
 
 Wspólne dla obu rodzajów:
-- Metadane: autor, wynik głosowania, data dodania
 - Przyciski do głosowania (tylko dla zalogowanych użytkowników)
-- Sekcja komentarzy
+- Sekcja komentarzy poniżej wpisu
 
 **URL:** `/wpis/{id}`
 
@@ -121,7 +123,7 @@ Dodawanie komentarzy odbywa się bez przeładowania strony dzięki **htmx**.
 
 ## 8. Głosowanie na wpisy
 
-Zalogowani użytkownicy mogą głosować na wpisy przyciskami `+` i `−`. Każdy użytkownik może oddać jeden głos na dany wpis (zmiana głosu jest możliwa). Wynik jest aktualizowany bez przeładowania strony dzięki **htmx**.
+Zalogowani użytkownicy mogą głosować na wpisy przyciskami `▲` i `▼`. Każdy użytkownik może oddać jeden głos na dany wpis (zmiana głosu jest możliwa). Wynik jest aktualizowany bez przeładowania strony dzięki **htmx**.
 
 ---
 
@@ -135,7 +137,7 @@ Zalogowani użytkownicy mogą głosować na komentarze przyciskami `+` i `−`. 
 
 Użytkownicy mogą oznaczać wpisy i komentarze tagami, wpisując `#nazwatagu` w treści. Tagi są automatycznie parsowane podczas wyświetlania i zamieniane na klikalne linki prowadzące do strony tagu.
 
-Strona tagu wyświetla wszystkie wpisy, których treść zawiera dany tag, posortowane od najnowszych. Prezentacja jest identyczna jak na stronie głównej (tytuł, autor, wynik, komentarze, data).
+Strona tagu wyświetla wszystkie wpisy, których treść zawiera dany tag, posortowane od najnowszych. Prezentacja jest identyczna jak na stronie głównej – dwukolumnowy układ z głosowaniem po lewej, autorem/treścią/stopką po prawej.
 
 **URL strony tagu:** `/tag/{nazwatagu}`
 

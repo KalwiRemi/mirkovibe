@@ -111,6 +111,70 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     $html .= '</div>';
     return $html;
 }
+function renderujKarteWpisu(array $wpis, bool $zalogowany): string {
+    $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
+    $autor      = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
+    $wynik      = (int)$wpis['wynik'];
+    $komentarze = (int)($wpis['liczba_komentarzy'] ?? 0);
+    $data       = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
+    $id         = (int)$wpis['id'];
+
+    $html  = '<li class="card">';
+    $html .= '<div class="card-layout">';
+
+    $html .= '<div class="card-votes">';
+    if ($zalogowany) {
+        $html .= '<button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
+    } else {
+        $html .= '<span class="vote-icon">▲</span>';
+    }
+    $html .= '<span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
+    if ($zalogowany) {
+        $html .= '<button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
+    } else {
+        $html .= '<span class="vote-icon">▼</span>';
+    }
+    $html .= '</div>';
+
+    $html .= '<div class="card-content">';
+    $html .= '<div class="card-header">';
+    $html .= '<strong class="card-author">' . $autor . '</strong>';
+    $html .= '<span class="card-date">' . $data . '</span>';
+    $html .= '</div>';
+
+    $html .= '<div class="card-body">';
+    if ($rodzaj === 'link') {
+        $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+        $html .= '<span class="type-badge type-badge--link">L</span> ';
+        $html .= '<a href="/wpis/' . $id . '" class="card-title">' . $tytul . '</a>';
+        if (!empty($wpis['link'])) {
+            $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
+            if (in_array($link_schema, ['http', 'https'], true)) {
+                $link_host = parse_url($wpis['link'], PHP_URL_HOST) ?? '';
+                $link_url  = htmlspecialchars($wpis['link'], ENT_QUOTES, 'UTF-8');
+                if ($link_host !== '') {
+                    $html .= ' <a href="' . $link_url . '" class="card-domain" rel="noopener noreferrer" target="_blank">(' . htmlspecialchars($link_host, ENT_QUOTES, 'UTF-8') . ')</a>';
+                }
+            }
+        }
+    } else {
+        $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
+        $html .= '<a href="/wpis/' . $id . '" class="card-title">' . $podglad . '</a>';
+    }
+    $html .= '</div>';
+
+    $html .= '<div class="card-footer">';
+    $html .= '<a href="/wpis/' . $id . '" class="card-meta-link">komentarze (' . $komentarze . ')</a>';
+    $html .= '<a href="/wpis/' . $id . '" class="card-meta-link card-meta-link--reply">odpowiedz</a>';
+    $html .= '</div>';
+
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</li>';
+
+    return $html;
+}
+
 function parsujTagi(string $tekst): string {
     return preg_replace_callback(
         '/(^|[^\p{L}\p{N}_#])#([\p{L}\p{N}_]+)/u',
@@ -223,48 +287,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
-                $autor      = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
-                $wynik      = (int)$wpis['wynik'];
-                $komentarze = (int)$wpis['liczba_komentarzy'];
-                $data       = htmlspecialchars(
-                    date('d.m.Y H:i', strtotime($wpis['data_dodania'])),
-                    ENT_QUOTES, 'UTF-8'
-                );
-                $id = (int)$wpis['id'];
-                echo '<li class="card">';
-                if ($rodzaj === 'link') {
-                    $tytul     = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
-                    echo '<span class="type-badge type-badge--link">L</span> ';
-                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $tytul . '</a>';
-                    if (!empty($wpis['link'])) {
-                        $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
-                        if (in_array($link_schema, ['http', 'https'], true)) {
-                            $link_host = parse_url($wpis['link'], PHP_URL_HOST) ?? '';
-                            $link_url  = htmlspecialchars($wpis['link'], ENT_QUOTES, 'UTF-8');
-                            if ($link_host !== '') {
-                                echo ' <a href="' . $link_url . '" class="card-domain" rel="noopener noreferrer" target="_blank">(' . htmlspecialchars($link_host, ENT_QUOTES, 'UTF-8') . ')</a>';
-                            }
-                        }
-                    }
-                } else {
-                    $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
-                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $podglad . '</a>';
-                }
-                echo '<div class="card-meta">';
-                echo 'Autor: <strong>' . $autor . '</strong>';
-                echo '<span class="sep">|</span>';
-                echo 'Wynik: <span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
-                if (isset($_SESSION['uzytkownik_id'])) {
-                    echo ' <button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-                    echo ' <button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
-                }
-                echo '<span class="sep">|</span>';
-                echo 'Komentarze: <strong>' . $komentarze . '</strong>';
-                echo '<span class="sep">|</span>';
-                echo $data;
-                echo '</div>';
-                echo '</li>';
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']));
             }
             echo '</ul>';
         }
@@ -288,10 +311,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania,
+                        COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
-                 WHERE w.id = :id'
+                 LEFT JOIN komentarze k ON k.wpis_id = w.id
+                 WHERE w.id = :id
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania'
             );
             $stmt->execute([':id' => $wpis_id]);
             $wpis = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -305,16 +331,39 @@ switch ($strona) {
             break;
         }
 
-        $rodzaj_wpisu = $wpis['rodzaj'] ?? 'wpis';
-        $autor = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
-        $wynik = (int)$wpis['wynik'];
-        $data  = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
+        $rodzaj_wpisu      = $wpis['rodzaj'] ?? 'wpis';
+        $autor             = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
+        $wynik             = (int)$wpis['wynik'];
+        $data              = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
+        $liczba_komentarzy = (int)($wpis['liczba_komentarzy'] ?? 0);
+        $zalogowany_wpis   = isset($_SESSION['uzytkownik_id']);
 
-        echo '<article class="article-card">';
+        echo '<div class="card card-layout card-layout--detail">';
 
+        echo '<div class="card-votes">';
+        if ($zalogowany_wpis) {
+            echo '<button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
+        } else {
+            echo '<span class="vote-icon">▲</span>';
+        }
+        echo '<span id="wynik-wpisu-' . $wpis_id . '" class="score">' . $wynik . '</span>';
+        if ($zalogowany_wpis) {
+            echo '<button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
+        } else {
+            echo '<span class="vote-icon">▼</span>';
+        }
+        echo '</div>';
+
+        echo '<div class="card-content">';
+        echo '<div class="card-header">';
+        echo '<strong class="card-author">' . $autor . '</strong>';
+        echo '<span class="card-date">' . $data . '</span>';
+        echo '</div>';
+
+        echo '<div class="card-body article-body">';
         if ($rodzaj_wpisu === 'link') {
             $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
-            echo '<h1><span class="type-badge type-badge--link">L</span> ' . $tytul . '</h1>';
+            echo '<p><span class="type-badge type-badge--link">L</span> ' . $tytul . '</p>';
             if (!empty($wpis['link'])) {
                 $link_raw    = $wpis['link'];
                 $link_schema = strtolower(parse_url($link_raw, PHP_URL_SCHEME) ?: '');
@@ -324,26 +373,22 @@ switch ($strona) {
                 }
             }
             if (!empty($wpis['tresc'])) {
-                echo '<div class="article-body article-tags">' . parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
+                echo '<div class="article-tags">' . parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
             }
         } else {
             if (!empty($wpis['tresc'])) {
-                echo '<div class="article-body">' . nl2br(parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8'))) . '</div>';
+                echo nl2br(parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')));
             }
         }
-
-        echo '<div class="card-meta">';
-        echo 'Autor: <strong>' . $autor . '</strong>';
-        echo '<span class="sep">|</span>';
-        echo 'Wynik: <span id="wynik-wpisu-' . $wpis_id . '" class="score">' . $wynik . '</span>';
-        if (isset($_SESSION['uzytkownik_id'])) {
-            echo ' <button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-            echo ' <button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $wpis_id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $wpis_id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
-        }
-        echo '<span class="sep">|</span>';
-        echo $data;
         echo '</div>';
-        echo '</article>';
+
+        echo '<div class="card-footer">';
+        echo '<a href="#komentarze-sekcja" class="card-meta-link">komentarze (' . $liczba_komentarzy . ')</a>';
+        echo '<a href="#komentarze-sekcja" class="card-meta-link card-meta-link--reply">odpowiedz</a>';
+        echo '</div>';
+
+        echo '</div>';
+        echo '</div>';
 
         try {
             $stmt = $polaczenie->prepare(
@@ -854,48 +899,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
-                $autor      = htmlspecialchars($wpis['autor'],        ENT_QUOTES, 'UTF-8');
-                $wynik      = (int)$wpis['wynik'];
-                $komentarze = (int)$wpis['liczba_komentarzy'];
-                $data       = htmlspecialchars(
-                    date('d.m.Y H:i', strtotime($wpis['data_dodania'])),
-                    ENT_QUOTES, 'UTF-8'
-                );
-                $id = (int)$wpis['id'];
-                echo '<li class="card">';
-                if ($rodzaj === 'link') {
-                    $tytul     = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
-                    echo '<span class="type-badge type-badge--link">L</span> ';
-                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $tytul . '</a>';
-                    if (!empty($wpis['link'])) {
-                        $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
-                        if (in_array($link_schema, ['http', 'https'], true)) {
-                            $link_host = parse_url($wpis['link'], PHP_URL_HOST) ?? '';
-                            $link_url  = htmlspecialchars($wpis['link'], ENT_QUOTES, 'UTF-8');
-                            if ($link_host !== '') {
-                                echo ' <a href="' . $link_url . '" class="card-domain" rel="noopener noreferrer" target="_blank">(' . htmlspecialchars($link_host, ENT_QUOTES, 'UTF-8') . ')</a>';
-                            }
-                        }
-                    }
-                } else {
-                    $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
-                    echo '<a href="/wpis/' . $id . '" class="card-title">' . $podglad . '</a>';
-                }
-                echo '<div class="card-meta">';
-                echo 'Autor: <strong>' . $autor . '</strong>';
-                echo '<span class="sep">|</span>';
-                echo 'Wynik: <span id="wynik-wpisu-' . $id . '" class="score">' . $wynik . '</span>';
-                if (isset($_SESSION['uzytkownik_id'])) {
-                    echo ' <button type="button" class="btn-vote up" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">+</button>';
-                    echo ' <button type="button" class="btn-vote down" hx-post="/glosuj" hx-target="#wynik-wpisu-' . $id . '" hx-swap="innerHTML" hx-vals=\'{"wpis_id":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">−</button>';
-                }
-                echo '<span class="sep">|</span>';
-                echo 'Komentarze: <strong>' . $komentarze . '</strong>';
-                echo '<span class="sep">|</span>';
-                echo $data;
-                echo '</div>';
-                echo '</li>';
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']));
             }
             echo '</ul>';
         }
@@ -1124,7 +1128,61 @@ $tresc = ob_get_clean();
 
         .card {
             border-bottom: 1px solid #e8e8e8;
-            padding: 6px 4px;
+            padding: 8px 4px;
+        }
+
+        /* ── Card two-column layout ── */
+        .card-layout {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+
+        .card-layout--detail {
+            padding: 8px 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-votes {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            min-width: 32px;
+            flex-shrink: 0;
+            padding-top: 1px;
+        }
+
+        .vote-icon {
+            font-size: 0.65rem;
+            color: #999;
+            line-height: 1;
+        }
+
+        .card-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 3px;
+            font-size: 0.78rem;
+        }
+
+        .card-author {
+            color: #000;
+            font-weight: bold;
+        }
+
+        .card-date {
+            color: #888;
+        }
+
+        .card-body {
+            margin-bottom: 4px;
         }
 
         .card-title {
@@ -1136,52 +1194,45 @@ $tresc = ob_get_clean();
         .card-title:hover { text-decoration: underline; }
         .card-title:visited { color: #444; }
 
-        .card-meta {
-            margin-top: 2px;
-            font-size: 0.78rem;
-            color: #555;
+        .card-footer {
             display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0 0.3rem;
+            gap: 0.75rem;
+            font-size: 0.78rem;
+            margin-top: 4px;
         }
 
-        .card-meta strong { color: #000; font-weight: normal; }
-        .card-meta .sep { color: #ccc; }
+        .card-meta-link {
+            color: #555;
+            text-decoration: none;
+        }
+
+        .card-meta-link:hover { color: #000; text-decoration: underline; }
+        .card-meta-link--reply { text-decoration: underline; }
 
         /* ── Score & Vote buttons ── */
-        .score { font-weight: bold; }
+        .score { font-weight: bold; font-size: 0.85rem; }
 
         .btn-vote {
             cursor: pointer;
-            font-size: 0.78rem;
+            font-size: 0.65rem;
             font-family: Verdana, Geneva, sans-serif;
             border: none;
             background: none;
-            color: #555;
-            padding: 0 2px;
+            color: #999;
+            padding: 0;
+            line-height: 1;
         }
 
-        .btn-vote:hover { color: #000; text-decoration: underline; }
+        .btn-vote:hover { color: #000; }
 
         /* ── Article (single post) ── */
-        .article-card {
-            border: 1px solid #ddd;
-            background: #fff;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .article-card h1 { margin-bottom: 0.75rem; }
-
         .article-body {
-            margin-bottom: 0.75rem;
             line-height: 1.6;
         }
 
         .article-link {
             display: inline-block;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.5rem;
             color: #000;
             font-size: 0.85rem;
             word-break: break-all;
