@@ -155,6 +155,7 @@ W panelu administrator może:
 - **Włączyć lub wyłączyć rejestrację** – checkbox „Rejestracja włączona". Gdy rejestracja jest wyłączona, strona `/rejestracja` wyświetla komunikat „Rejestracja wyłączona" dla zwykłych użytkowników.
 - **Ustawić minimalny czas przed dodaniem wpisu** – pole liczbowe „Minimalny czas przed dodaniem wpisu (godz.)". Domyślnie **12 godzin**.
 - **Ustawić minimalny czas przed dodaniem komentarza** – pole liczbowe „Minimalny czas przed dodaniem komentarza (godz.)". Domyślnie **1 godzina**.
+- **Zarządzać moderatorami** – sekcja „Moderatorzy" umożliwia mianowanie dowolnego użytkownika moderatorem (podając jego nazwę) lub odebranie mu tej roli przyciskiem „Usuń" przy jego nazwie na liście. Administratorzy nie mogą być jednocześnie moderatorami (próba zmiany ich roli jest blokowana). Lista aktualnych moderatorów wyświetlana jest bezpośrednio w panelu.
 
 Dostęp do panelu wymaga zalogowania jako administrator. Próba wejścia bez uprawnień zwraca błąd 403.
 

@@ -647,7 +647,7 @@ switch ($strona) {
 
             if (empty($bledy)) {
                 try {
-                    $stmt = $polaczenie->prepare('SELECT id, nazwa, haslo_hash, jest_adminem, email, email_zweryfikowany FROM uzytkownicy WHERE nazwa = :nazwa');
+                    $stmt = $polaczenie->prepare('SELECT id, nazwa, haslo_hash, jest_adminem, jest_moderatorem, email, email_zweryfikowany FROM uzytkownicy WHERE nazwa = :nazwa');
                     $stmt->execute([':nazwa' => $nazwa_wpisana]);
                     $uzytkownik = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -656,9 +656,10 @@ switch ($strona) {
                             $bledy[] = 'Twój adres email nie został jeszcze zweryfikowany. Sprawdź swoją skrzynkę pocztową.';
                         } else {
                             session_regenerate_id(true);
-                            $_SESSION['uzytkownik_id']    = $uzytkownik['id'];
-                            $_SESSION['uzytkownik_nazwa'] = $uzytkownik['nazwa'];
-                            $_SESSION['jest_adminem']     = (bool)$uzytkownik['jest_adminem'];
+                            $_SESSION['uzytkownik_id']       = $uzytkownik['id'];
+                            $_SESSION['uzytkownik_nazwa']    = $uzytkownik['nazwa'];
+                            $_SESSION['jest_adminem']        = (bool)$uzytkownik['jest_adminem'];
+                            $_SESSION['jest_moderatorem']    = (bool)$uzytkownik['jest_moderatorem'];
                             header('Location: /');
                             exit;
                         }
@@ -1040,8 +1041,43 @@ switch ($strona) {
         }
 
         $komunikat_admina = '';
+        $komunikat_moderatora = '';
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcja_moderatora'])) {
+            $nazwa_moderatora = trim($_POST['nazwa_moderatora'] ?? '');
+            if ($nazwa_moderatora === '') {
+                $komunikat_moderatora = 'Podaj nazwę użytkownika.';
+            } else {
+                $akcja = $_POST['akcja_moderatora'];
+                if ($akcja === 'dodaj' || $akcja === 'usun') {
+                    $nowa_wartosc_mod = $akcja === 'dodaj';
+                    try {
+                        $polaczenie->beginTransaction();
+                        $stmt_check = $polaczenie->prepare('SELECT jest_adminem FROM uzytkownicy WHERE nazwa = :nazwa FOR UPDATE');
+                        $stmt_check->execute([':nazwa' => $nazwa_moderatora]);
+                        $wiersz = $stmt_check->fetch(PDO::FETCH_ASSOC);
+                        if ($wiersz === false) {
+                            $polaczenie->rollBack();
+                            $komunikat_moderatora = 'Nie znaleziono użytkownika o podanej nazwie.';
+                        } elseif ($wiersz['jest_adminem']) {
+                            $polaczenie->rollBack();
+                            $komunikat_moderatora = 'Nie można zmieniać roli moderatora dla administratora.';
+                        } else {
+                            $stmt_mod = $polaczenie->prepare('UPDATE uzytkownicy SET jest_moderatorem = :wartosc WHERE nazwa = :nazwa');
+                            $stmt_mod->execute([':wartosc' => $nowa_wartosc_mod ? 'true' : 'false', ':nazwa' => $nazwa_moderatora]);
+                            $polaczenie->commit();
+                            $komunikat_moderatora = $akcja === 'dodaj'
+                                ? 'Użytkownik „' . htmlspecialchars($nazwa_moderatora, ENT_QUOTES, 'UTF-8') . '" został mianowany moderatorem.'
+                                : 'Użytkownik „' . htmlspecialchars($nazwa_moderatora, ENT_QUOTES, 'UTF-8') . '" został pozbawiony roli moderatora.';
+                        }
+                    } catch (PDOException $e) {
+                        if ($polaczenie->inTransaction()) $polaczenie->rollBack();
+                        error_log('Błąd zmiany moderatora: ' . $e->getMessage());
+                        $komunikat_moderatora = 'Wystąpił błąd podczas zmiany uprawnień moderatora.';
+                    }
+                }
+            }
+        } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nowa_wartosc = (isset($_POST['rejestracja_wlaczona']) && $_POST['rejestracja_wlaczona'] === '1') ? 'true' : 'false';
             $czas_wpisu       = max(0, (int)($_POST['minimalny_czas_wpisu']       ?? DOMYSLNY_CZAS_WPISU));
             $czas_komentarza  = max(0, (int)($_POST['minimalny_czas_komentarza']  ?? DOMYSLNY_CZAS_KOMENTARZA));
@@ -1073,6 +1109,14 @@ switch ($strona) {
             error_log('Błąd odczytu konfiguracji: ' . $e->getMessage());
         }
 
+        $moderatorzy = [];
+        try {
+            $stmt_mods = $polaczenie->query("SELECT nazwa FROM uzytkownicy WHERE jest_moderatorem = TRUE ORDER BY nazwa");
+            $moderatorzy = $stmt_mods->fetchAll(PDO::FETCH_COLUMN);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania moderatorów: ' . $e->getMessage());
+        }
+
         echo '<h1>Panel administratora</h1>';
         if ($komunikat_admina !== '') {
             echo '<p class="admin-msg">' . htmlspecialchars($komunikat_admina, ENT_QUOTES, 'UTF-8') . '</p>';
@@ -1093,6 +1137,37 @@ switch ($strona) {
         echo '</label>';
         echo '<button type="submit" class="btn-primary">Zapisz</button>';
         echo '</form>';
+        echo '</section>';
+
+        echo '<section class="admin-section">';
+        echo '<h2>Moderatorzy</h2>';
+        if ($komunikat_moderatora !== '') {
+            echo '<p class="admin-msg">' . htmlspecialchars($komunikat_moderatora, ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+        echo '<form method="post" class="form-stack">';
+        echo '<input type="hidden" name="akcja_moderatora" value="dodaj">';
+        echo '<label class="admin-label">Nazwa użytkownika:';
+        echo '<input type="text" name="nazwa_moderatora" placeholder="Nazwa użytkownika" style="margin-left:0.5rem">';
+        echo '</label>';
+        echo '<button type="submit" class="btn-primary">Dodaj moderatora</button>';
+        echo '</form>';
+        if (!empty($moderatorzy)) {
+            echo '<h3 style="margin-top:1rem">Aktualni moderatorzy</h3>';
+            echo '<ul class="moderator-list">';
+            foreach ($moderatorzy as $mod) {
+                echo '<li>';
+                echo htmlspecialchars($mod, ENT_QUOTES, 'UTF-8');
+                echo '<form method="post" style="display:inline;margin-left:0.5rem">';
+                echo '<input type="hidden" name="akcja_moderatora" value="usun">';
+                echo '<input type="hidden" name="nazwa_moderatora" value="' . htmlspecialchars($mod, ENT_QUOTES, 'UTF-8') . '">';
+                echo '<button type="submit" class="btn-danger">Usuń</button>';
+                echo '</form>';
+                echo '</li>';
+            }
+            echo '</ul>';
+        } else {
+            echo '<p style="margin-top:0.75rem;font-size:0.9rem">Brak moderatorów.</p>';
+        }
         echo '</section>';
         break;
     case 'wyloguj':
@@ -1664,6 +1739,10 @@ $tresc = ob_get_clean();
         .admin-section { margin-top: 1rem; }
         .admin-msg { margin-bottom: 0.75rem; border: 1px solid #999; padding: 4px 8px; font-size: 0.85rem; }
         .admin-label { font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; }
+        .btn-danger { font-size: 0.8rem; padding: 2px 6px; background: #fff; border: 1px solid #c00; color: #c00; cursor: pointer; }
+        .btn-danger:hover { background: #c00; color: #fff; }
+        .moderator-list { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+        .moderator-list li { padding: 3px 0; font-size: 0.9rem; }
     </style>
 </head>
 <body>

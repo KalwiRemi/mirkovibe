@@ -7,6 +7,7 @@ CREATE TABLE uzytkownicy (
     email                TEXT UNIQUE,
     email_zweryfikowany  BOOLEAN NOT NULL DEFAULT FALSE,
     jest_adminem         BOOLEAN NOT NULL DEFAULT FALSE,
+    jest_moderatorem     BOOLEAN NOT NULL DEFAULT FALSE,
     data_rejestracji     TIMESTAMPTZ DEFAULT NOW()
 );
 
