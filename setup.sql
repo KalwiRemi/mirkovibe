@@ -39,7 +39,8 @@ CREATE TABLE komentarze (
     tresc        TEXT NOT NULL,
     data_dodania TIMESTAMPTZ DEFAULT NOW(),
     wynik        INT DEFAULT 0,
-    rodzic_id    INT REFERENCES komentarze(id)
+    rodzic_id    INT REFERENCES komentarze(id),
+    usunieto     BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE tokeny_weryfikacji (

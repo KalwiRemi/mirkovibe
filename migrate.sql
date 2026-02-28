@@ -103,6 +103,9 @@ ALTER TABLE uzytkownicy ADD COLUMN IF NOT EXISTS jest_moderatorem BOOLEAN NOT NU
 -- Migracja: system moderacji wpisów
 ALTER TABLE wpisy ADD COLUMN IF NOT EXISTS usunieto BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Migracja: system moderacji komentarzy
+ALTER TABLE komentarze ADD COLUMN IF NOT EXISTS usunieto BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE OR REPLACE VIEW wpisy_z_wynikiem AS
 SELECT
     w.id,
