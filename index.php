@@ -1253,14 +1253,11 @@ $tresc = ob_get_clean();
 
         .comment-list {
             list-style: none;
-            border-top: 1px solid #e8e8e8;
         }
 
         .comment-item {
-            border-bottom: 1px solid #e8e8e8;
             padding: 8px 4px;
             padding-left: 1.5rem;
-            border-left: 2px solid #e0e0e0;
             margin-left: 16px;
         }
 
