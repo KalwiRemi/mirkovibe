@@ -93,3 +93,7 @@ CREATE TABLE IF NOT EXISTS tokeny_weryfikacji (
     uzytkownik_id    INT REFERENCES uzytkownicy(id) ON DELETE CASCADE,
     data_wygasniecia TIMESTAMPTZ NOT NULL
 );
+
+-- Migracja: zagnieżdżone komentarze
+ALTER TABLE komentarze ADD COLUMN IF NOT EXISTS rodzic_id INT REFERENCES komentarze(id);
+

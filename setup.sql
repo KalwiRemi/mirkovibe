@@ -36,7 +36,8 @@ CREATE TABLE komentarze (
     autor_id     INT REFERENCES uzytkownicy(id),
     tresc        TEXT NOT NULL,
     data_dodania TIMESTAMPTZ DEFAULT NOW(),
-    wynik        INT DEFAULT 0
+    wynik        INT DEFAULT 0,
+    rodzic_id    INT REFERENCES komentarze(id)
 );
 
 CREATE TABLE tokeny_weryfikacji (

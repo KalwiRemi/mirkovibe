@@ -27,7 +27,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin', 'weryfikuj_email'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin', 'weryfikuj_email', 'komentarz'];
 
 function formatujCzasOczekiwania(float $godziny): string {
     if ($godziny < 1) {
@@ -119,31 +119,59 @@ function renderujSekcjeGlosow(string $typ, int $id, int $wynik, bool $zalogowany
     return $html;
 }
 
+function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $glosy, array $dzieci, int $glebokosc = 0): string {
+    $k_id    = (int)$komentarz['id'];
+    $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
+    $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
+    $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
+    $k_wynik = (int)($komentarz['wynik'] ?? 0);
+    $k_glos  = (int)($glosy[$k_id] ?? 0);
+
+    $html  = '<li class="comment-item">';
+    $html .= '<div class="card-layout">';
+    $html .= renderujSekcjeGlosow('komentarz', $k_id, $k_wynik, $zalogowany, $k_glos);
+    $html .= '<div class="card-content">';
+    $html .= '<div class="card-header">';
+    $html .= '<strong class="card-author">' . $k_autor . '</strong>';
+    $html .= '<span class="card-date">' . $k_data . '</span>';
+    $html .= '</div>';
+    $html .= '<div class="card-body">' . nl2br(parsujTagi($k_tresc)) . '</div>';
+    $html .= '<div class="card-footer">';
+    $html .= '<a href="/komentarz/' . $k_id . '" class="card-meta-link card-meta-link--reply">odpowiedz</a>';
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</div>';
+
+    if (!empty($dzieci[$k_id]) && $glebokosc < 10) {
+        $html .= '<ul class="comment-list comment-list--zagniezdzone">';
+        foreach ($dzieci[$k_id] as $dziecko) {
+            $html .= renderujElementKomentarza($dziecko, $zalogowany, $glosy, $dzieci, $glebokosc + 1);
+        }
+        $html .= '</ul>';
+    }
+
+    $html .= '</li>';
+    return $html;
+}
+
 function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0, array $glosy_uzytkownika = []): string {
     $html  = '<div id="komentarze-sekcja">';
     $html .= '<section class="comments-section">';
 
     if (!empty($komentarze)) {
+        $dzieci   = [];
+        $korzenie = [];
+        foreach ($komentarze as $k) {
+            $rodzic = ($k['rodzic_id'] !== null) ? (int)$k['rodzic_id'] : null;
+            if ($rodzic !== null) {
+                $dzieci[$rodzic][] = $k;
+            } else {
+                $korzenie[] = $k;
+            }
+        }
         $html .= '<ul class="comment-list">';
-        foreach ($komentarze as $komentarz) {
-            $k_id    = (int)$komentarz['id'];
-            $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
-            $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
-            $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
-            $k_wynik = (int)($komentarz['wynik'] ?? 0);
-            $html .= '<li class="comment-item">';
-            $html .= '<div class="card-layout">';
-            $k_glos = (int)($glosy_uzytkownika[$k_id] ?? 0);
-            $html .= renderujSekcjeGlosow('komentarz', $k_id, $k_wynik, $zalogowany, $k_glos);
-            $html .= '<div class="card-content">';
-            $html .= '<div class="card-header">';
-            $html .= '<strong class="card-author">' . $k_autor . '</strong>';
-            $html .= '<span class="card-date">' . $k_data . '</span>';
-            $html .= '</div>';
-            $html .= '<div class="card-body">' . nl2br(parsujTagi($k_tresc)) . '</div>';
-            $html .= '</div>';
-            $html .= '</div>';
-            $html .= '</li>';
+        foreach ($korzenie as $k) {
+            $html .= renderujElementKomentarza($k, $zalogowany, $glosy_uzytkownika, $dzieci);
         }
         $html .= '</ul>';
     }
@@ -258,6 +286,12 @@ if (!isset($_GET['strona'])) {
             break;
         case 'dodaj_komentarz':
             $_GET['strona'] = 'dodaj_komentarz';
+            if ($seg1 !== null && ctype_digit($seg1)) {
+                $_GET['id'] = $seg1;
+            }
+            break;
+        case 'komentarz':
+            $_GET['strona'] = 'komentarz';
             if ($seg1 !== null && ctype_digit($seg1)) {
                 $_GET['id'] = $seg1;
             }
@@ -440,13 +474,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, u.nazwa AS autor, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
-                 GROUP BY k.id, k.tresc, u.nazwa, k.data_dodania
+                 GROUP BY k.id, k.tresc, k.rodzic_id, u.nazwa, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -793,6 +827,22 @@ switch ($strona) {
             exit;
         }
 
+        $rodzic_id_raw = (int)($_POST['rodzic_id'] ?? 0);
+        $rodzic_id = $rodzic_id_raw > 0 ? $rodzic_id_raw : null;
+
+        if ($rodzic_id !== null) {
+            try {
+                $stmt_rch = $polaczenie->prepare('SELECT wpis_id FROM komentarze WHERE id = :id');
+                $stmt_rch->execute([':id' => $rodzic_id]);
+                $rodzic_wpis = $stmt_rch->fetchColumn();
+                if ($rodzic_wpis === false || (int)$rodzic_wpis !== $wpis_id) {
+                    $rodzic_id = null;
+                }
+            } catch (PDOException $e) {
+                $rodzic_id = null;
+            }
+        }
+
         $godziny_oczekiwania_komentarz = empty($_SESSION['jest_adminem'])
             ? sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')
             : 0.0;
@@ -807,13 +857,14 @@ switch ($strona) {
             } else {
                 try {
                     $stmt = $polaczenie->prepare(
-                        'INSERT INTO komentarze (wpis_id, autor_id, tresc)
-                         VALUES (:wpis_id, :autor_id, :tresc)'
+                        'INSERT INTO komentarze (wpis_id, autor_id, tresc, rodzic_id)
+                         VALUES (:wpis_id, :autor_id, :tresc, :rodzic_id)'
                     );
                     $stmt->execute([
-                        ':wpis_id'  => $wpis_id,
-                        ':autor_id' => $_SESSION['uzytkownik_id'],
-                        ':tresc'    => $tresc_komentarza,
+                        ':wpis_id'   => $wpis_id,
+                        ':autor_id'  => $_SESSION['uzytkownik_id'],
+                        ':tresc'     => $tresc_komentarza,
+                        ':rodzic_id' => $rodzic_id,
                     ]);
                 } catch (PDOException $e) {
                     error_log('Błąd dodawania komentarza: ' . $e->getMessage());
@@ -822,15 +873,24 @@ switch ($strona) {
             }
         }
 
+        if (empty($_SERVER['HTTP_HX_REQUEST'])) {
+            if ($rodzic_id !== null) {
+                header('Location: /komentarz/' . $rodzic_id);
+            } else {
+                header('Location: /wpis/' . $wpis_id);
+            }
+            exit;
+        }
+
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, u.nazwa AS autor, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
-                 GROUP BY k.id, k.tresc, u.nazwa, k.data_dodania
+                 GROUP BY k.id, k.tresc, k.rodzic_id, u.nazwa, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -1097,6 +1157,131 @@ switch ($strona) {
             echo '<p>Wystąpił błąd podczas weryfikacji. Spróbuj ponownie.</p>';
         }
         break;
+    case 'komentarz':
+        $komentarz_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if ($komentarz_id <= 0) {
+            echo '<p>Nieprawidłowy identyfikator komentarza.</p>';
+            break;
+        }
+
+        try {
+            $stmt = $polaczenie->prepare(
+                'SELECT k.id, k.tresc, k.rodzic_id, k.wpis_id, u.nazwa AS autor, k.data_dodania,
+                        COALESCE(SUM(g.wartosc), 0) AS wynik
+                 FROM komentarze k
+                 JOIN uzytkownicy u ON u.id = k.autor_id
+                 LEFT JOIN glosy g ON g.komentarz_id = k.id
+                 WHERE k.id = :id
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.wpis_id, u.nazwa, k.data_dodania'
+            );
+            $stmt->execute([':id' => $komentarz_id]);
+            $komentarz = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania komentarza: ' . $e->getMessage());
+            $komentarz = null;
+        }
+
+        if (!$komentarz) {
+            echo '<p>Nie znaleziono komentarza.</p>';
+            break;
+        }
+
+        $wpis_id_k    = (int)$komentarz['wpis_id'];
+        $zalogowany_k = isset($_SESSION['uzytkownik_id']);
+
+        echo '<p><a href="/wpis/' . $wpis_id_k . '">← Wróć do wpisu</a></p>';
+
+        $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
+        $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
+        $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
+        $k_wynik = (int)($komentarz['wynik'] ?? 0);
+
+        $glos_k = 0;
+        if ($zalogowany_k) {
+            try {
+                $stmt_gk = $polaczenie->prepare('SELECT wartosc FROM glosy WHERE uzytkownik_id = :u AND komentarz_id = :k');
+                $stmt_gk->execute([':u' => $_SESSION['uzytkownik_id'], ':k' => $komentarz_id]);
+                $glos_k = (int)($stmt_gk->fetchColumn() ?: 0);
+            } catch (PDOException $e) {
+                error_log('Błąd pobierania głosu: ' . $e->getMessage());
+            }
+        }
+
+        echo '<div class="card card-layout card-layout--detail">';
+        echo renderujSekcjeGlosow('komentarz', $komentarz_id, $k_wynik, $zalogowany_k, $glos_k);
+        echo '<div class="card-content">';
+        echo '<div class="card-header">';
+        echo '<strong class="card-author">' . $k_autor . '</strong>';
+        echo '<span class="card-date">' . $k_data . '</span>';
+        echo '</div>';
+        echo '<div class="card-body article-body">' . nl2br(parsujTagi($k_tresc)) . '</div>';
+        echo '</div>';
+        echo '</div>';
+
+        try {
+            $stmt = $polaczenie->prepare(
+                'WITH RECURSIVE poddrzewo AS (
+                     SELECT k.id FROM komentarze k WHERE k.rodzic_id = :komentarz_id
+                     UNION ALL
+                     SELECT k.id FROM komentarze k JOIN poddrzewo p ON k.rodzic_id = p.id
+                 )
+                 SELECT k.id, k.tresc, k.rodzic_id, u.nazwa AS autor, k.data_dodania,
+                        COALESCE(SUM(g.wartosc), 0) AS wynik
+                 FROM komentarze k
+                 JOIN poddrzewo pd ON pd.id = k.id
+                 JOIN uzytkownicy u ON u.id = k.autor_id
+                 LEFT JOIN glosy g ON g.komentarz_id = k.id
+                 GROUP BY k.id, k.tresc, k.rodzic_id, u.nazwa, k.data_dodania
+                 ORDER BY k.data_dodania ASC'
+            );
+            $stmt->execute([':komentarz_id' => $komentarz_id]);
+            $wszystkie_k = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania odpowiedzi: ' . $e->getMessage());
+            $wszystkie_k = [];
+        }
+
+        $glosy_k = $zalogowany_k
+            ? pobierzGlosyKomentarzy($polaczenie, (int)$_SESSION['uzytkownik_id'], $wszystkie_k)
+            : [];
+
+        $dzieci_k = [];
+        foreach ($wszystkie_k as $k) {
+            $rodzic = ($k['rodzic_id'] !== null) ? (int)$k['rodzic_id'] : null;
+            if ($rodzic !== null) {
+                $dzieci_k[$rodzic][] = $k;
+            }
+        }
+
+        echo '<div id="komentarze-sekcja">';
+        echo '<section class="comments-section">';
+        if (!empty($dzieci_k[$komentarz_id])) {
+            echo '<ul class="comment-list">';
+            foreach ($dzieci_k[$komentarz_id] as $dziecko) {
+                echo renderujElementKomentarza($dziecko, $zalogowany_k, $glosy_k, $dzieci_k);
+            }
+            echo '</ul>';
+        }
+        echo '</section>';
+
+        if ($zalogowany_k) {
+            $godziny_oczekiwania_k = empty($_SESSION['jest_adminem'])
+                ? sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')
+                : 0.0;
+            if ($godziny_oczekiwania_k > 0) {
+                echo '<p class="empty-state">Możesz dodać komentarz za ' . formatujCzasOczekiwania($godziny_oczekiwania_k) . '.</p>';
+            } else {
+                echo '<form method="post" action="/dodaj_komentarz/' . $wpis_id_k . '" class="form-stack form-stack--comment">';
+                echo '<input type="hidden" name="rodzic_id" value="' . $komentarz_id . '">';
+                echo '<textarea name="tresc" placeholder="Dodaj odpowiedź..." rows="3" maxlength="2000" required></textarea>';
+                echo '<button type="submit" class="btn-primary">Wyślij odpowiedź</button>';
+                echo '</form>';
+            }
+        } else {
+            echo '<p class="empty-state"><a href="/logowanie">Zaloguj się</a>, aby odpowiedzieć.</p>';
+        }
+        echo '</div>';
+        break;
 }
 $tresc = ob_get_clean();
 
@@ -1312,6 +1497,13 @@ $tresc = ob_get_clean();
 
         .comment-list {
             list-style: none;
+        }
+
+        .comment-list--zagniezdzone {
+            list-style: none;
+            margin-left: 1.5rem;
+            border-left: 2px solid #e8e8e8;
+            padding-left: 0.5rem;
         }
 
         .comment-item {
