@@ -97,3 +97,6 @@ CREATE TABLE IF NOT EXISTS tokeny_weryfikacji (
 -- Migracja: zagnieżdżone komentarze
 ALTER TABLE komentarze ADD COLUMN IF NOT EXISTS rodzic_id INT REFERENCES komentarze(id);
 
+-- Migracja: rola moderatora
+ALTER TABLE uzytkownicy ADD COLUMN IF NOT EXISTS jest_moderatorem BOOLEAN NOT NULL DEFAULT FALSE;
+
