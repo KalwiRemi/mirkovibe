@@ -67,19 +67,7 @@ INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_wpisu', '12')
 INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_komentarza', '1')
     ON CONFLICT (klucz) DO NOTHING;
 
-CREATE OR REPLACE VIEW wpisy_z_wynikiem AS
-SELECT
-    w.id,
-    w.tytul,
-    w.tresc,
-    w.link,
-    w.autor_id,
-    w.data_dodania,
-    COALESCE(SUM(g.wartosc), 0) AS wynik,
-    w.rodzaj
-FROM wpisy w
-LEFT JOIN glosy g ON g.wpis_id = w.id
-GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj;
+DROP VIEW IF EXISTS wpisy_z_wynikiem;
 
 -- Migracja: weryfikacja email podczas rejestracji
 ALTER TABLE uzytkownicy ADD COLUMN IF NOT EXISTS email TEXT;
@@ -106,7 +94,7 @@ ALTER TABLE wpisy ADD COLUMN IF NOT EXISTS usunieto BOOLEAN NOT NULL DEFAULT FAL
 -- Migracja: system moderacji komentarzy
 ALTER TABLE komentarze ADD COLUMN IF NOT EXISTS usunieto BOOLEAN NOT NULL DEFAULT FALSE;
 
-CREATE OR REPLACE VIEW wpisy_z_wynikiem AS
+CREATE VIEW wpisy_z_wynikiem AS
 SELECT
     w.id,
     w.tytul,
