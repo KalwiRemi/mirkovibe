@@ -163,6 +163,28 @@ Dostęp do panelu wymaga zalogowania jako administrator. Próba wejścia bez upr
 
 ---
 
+## 12. System moderacji wpisów i komentarzy
+
+Moderatorzy (i administratorzy) mogą usuwać i przywracać wpisy oraz komentarze.
+
+### Wpisy
+- **Usunięcie wpisu:** Na stronie wpisu oraz na liście wpisów, po prawej stronie daty wpisu, widoczny jest przycisk **MODERACJA: USUŃ** (kolor czerwony). Kliknięcie go oznacza wpis jako usunięty.
+- **Przywrócenie wpisu:** Gdy wpis jest oznaczony jako usunięty, przycisk zmienia się na **MODERACJA: PRZYWRÓĆ** (kolor zielony). Kliknięcie go przywraca wpis.
+- **Widok moderatora dla usuniętego wpisu:** Moderator widzi treść wpisu z przekreślonym tekstem. Po najechaniu myszką na treść przekreślenie znika.
+- **Widok zwykłego użytkownika dla usuniętego wpisu:** Zwykły użytkownik zamiast treści widzi komunikat _„Ten wpis został usunięty przez moderatora"_.
+
+**URL akcji moderacji wpisu:** `/moderuj_wpis` (POST)
+
+### Komentarze
+- **Usunięcie komentarza:** Na stronie wpisu oraz na stronie komentarza, po prawej stronie daty komentarza, widoczny jest przycisk **MODERACJA: USUŃ** (kolor czerwony).
+- **Przywrócenie komentarza:** Gdy komentarz jest usunięty, przycisk zmienia się na **MODERACJA: PRZYWRÓĆ** (kolor zielony).
+- **Widok moderatora dla usuniętego komentarza:** Treść z przekreślonym tekstem (po najechaniu myszką przekreślenie znika).
+- **Widok zwykłego użytkownika dla usuniętego komentarza:** Zamiast treści wyświetla się _„Ten komentarz został usunięty przez moderatora"_.
+
+**URL akcji moderacji komentarza:** `/moderuj_komentarz` (POST)
+
+---
+
 ## Techniczny stack
 
 - **PHP** – logika aplikacji (jeden plik: `index.php`)

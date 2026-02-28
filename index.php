@@ -27,7 +27,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin', 'weryfikuj_email', 'komentarz'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin', 'weryfikuj_email', 'komentarz', 'moderuj_wpis', 'moderuj_komentarz'];
 
 function formatujCzasOczekiwania(float $godziny): string {
     if ($godziny < 1) {
@@ -119,13 +119,14 @@ function renderujSekcjeGlosow(string $typ, int $id, int $wynik, bool $zalogowany
     return $html;
 }
 
-function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $glosy, array $dzieci, int $glebokosc = 0): string {
-    $k_id    = (int)$komentarz['id'];
-    $k_autor = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
-    $k_tresc = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
-    $k_data  = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
-    $k_wynik = (int)($komentarz['wynik'] ?? 0);
-    $k_glos  = (int)($glosy[$k_id] ?? 0);
+function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $glosy, array $dzieci, int $glebokosc = 0, bool $jest_moderatorem = false): string {
+    $k_id      = (int)$komentarz['id'];
+    $k_autor   = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
+    $k_tresc   = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
+    $k_data    = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
+    $k_wynik   = (int)($komentarz['wynik'] ?? 0);
+    $k_glos    = (int)($glosy[$k_id] ?? 0);
+    $usunieto  = !empty($komentarz['usunieto']);
 
     $html  = '<li class="comment-item">';
     $html .= '<div class="card-layout">';
@@ -134,8 +135,28 @@ function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $gl
     $html .= '<div class="card-header">';
     $html .= '<strong class="card-author">' . $k_autor . '</strong>';
     $html .= '<span class="card-date">' . $k_data . '</span>';
+    if ($jest_moderatorem) {
+        if ($usunieto) {
+            $html .= '<form method="post" action="/moderuj_komentarz" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="komentarz_id" value="' . $k_id . '">'
+                   . '<input type="hidden" name="akcja" value="przywroc">'
+                   . '<button type="submit" class="btn-mod btn-mod--przywroc">MODERACJA: PRZYWRÓĆ</button>'
+                   . '</form>';
+        } else {
+            $html .= '<form method="post" action="/moderuj_komentarz" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="komentarz_id" value="' . $k_id . '">'
+                   . '<input type="hidden" name="akcja" value="usun">'
+                   . '<button type="submit" class="btn-mod btn-mod--usun">MODERACJA: USUŃ</button>'
+                   . '</form>';
+        }
+    }
     $html .= '</div>';
-    $html .= '<div class="card-body">' . nl2br(parsujTagi($k_tresc)) . '</div>';
+    if ($usunieto && !$jest_moderatorem) {
+        $html .= '<div class="card-body"><em class="wpis-usuniety-info">Ten komentarz został usunięty przez moderatora</em></div>';
+    } else {
+        $tresc_html = nl2br(parsujTagi($k_tresc));
+        $html .= '<div class="card-body' . ($usunieto ? ' wpis-usuniety' : '') . '">' . $tresc_html . '</div>';
+    }
     $html .= '<div class="card-footer">';
     $html .= '<a href="/komentarz/' . $k_id . '" class="card-meta-link card-meta-link--reply">odpowiedz</a>';
     $html .= '</div>';
@@ -145,7 +166,7 @@ function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $gl
     if (!empty($dzieci[$k_id]) && $glebokosc < 10) {
         $html .= '<ul class="comment-list comment-list--zagniezdzone">';
         foreach ($dzieci[$k_id] as $dziecko) {
-            $html .= renderujElementKomentarza($dziecko, $zalogowany, $glosy, $dzieci, $glebokosc + 1);
+            $html .= renderujElementKomentarza($dziecko, $zalogowany, $glosy, $dzieci, $glebokosc + 1, $jest_moderatorem);
         }
         $html .= '</ul>';
     }
@@ -154,7 +175,7 @@ function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $gl
     return $html;
 }
 
-function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0, array $glosy_uzytkownika = []): string {
+function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0, array $glosy_uzytkownika = [], bool $jest_moderatorem = false): string {
     $html  = '<div id="komentarze-sekcja">';
     $html .= '<section class="comments-section">';
 
@@ -171,7 +192,7 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
         }
         $html .= '<ul class="comment-list">';
         foreach ($korzenie as $k) {
-            $html .= renderujElementKomentarza($k, $zalogowany, $glosy_uzytkownika, $dzieci);
+            $html .= renderujElementKomentarza($k, $zalogowany, $glosy_uzytkownika, $dzieci, 0, $jest_moderatorem);
         }
         $html .= '</ul>';
     }
@@ -196,13 +217,14 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     $html .= '</div>';
     return $html;
 }
-function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika = 0): string {
+function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika = 0, bool $jest_moderatorem = false): string {
     $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
     $autor      = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
     $wynik      = (int)$wpis['wynik'];
     $komentarze = (int)($wpis['liczba_komentarzy'] ?? 0);
     $data       = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
     $id         = (int)$wpis['id'];
+    $usunieto   = !empty($wpis['usunieto']);
 
     $html  = '<li class="card">';
     $html .= '<div class="card-layout">';
@@ -213,13 +235,31 @@ function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika
     $html .= '<div class="card-header">';
     $html .= '<strong class="card-author">' . $autor . '</strong>';
     $html .= '<span class="card-date">' . $data . '</span>';
+    if ($jest_moderatorem) {
+        if ($usunieto) {
+            $html .= '<form method="post" action="/moderuj_wpis" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="wpis_id" value="' . $id . '">'
+                   . '<input type="hidden" name="akcja" value="przywroc">'
+                   . '<button type="submit" class="btn-mod btn-mod--przywroc">MODERACJA: PRZYWRÓĆ</button>'
+                   . '</form>';
+        } else {
+            $html .= '<form method="post" action="/moderuj_wpis" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="wpis_id" value="' . $id . '">'
+                   . '<input type="hidden" name="akcja" value="usun">'
+                   . '<button type="submit" class="btn-mod btn-mod--usun">MODERACJA: USUŃ</button>'
+                   . '</form>';
+        }
+    }
     $html .= '</div>';
 
     $html .= '<div class="card-body">';
-    if ($rodzaj === 'link') {
+    if ($usunieto && !$jest_moderatorem) {
+        $html .= '<em class="wpis-usuniety-info">Ten wpis został usunięty przez moderatora</em>';
+    } elseif ($rodzaj === 'link') {
         $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+        $kl_usuniety = $usunieto ? ' wpis-usuniety' : '';
         $html .= '<span class="type-badge type-badge--link">L</span> ';
-        $html .= '<a href="/wpis/' . $id . '" class="card-title">' . $tytul . '</a>';
+        $html .= '<a href="/wpis/' . $id . '" class="card-title' . $kl_usuniety . '">' . $tytul . '</a>';
         if (!empty($wpis['link'])) {
             $link_schema = strtolower(parse_url($wpis['link'], PHP_URL_SCHEME) ?: '');
             if (in_array($link_schema, ['http', 'https'], true)) {
@@ -232,7 +272,8 @@ function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika
         }
     } else {
         $podglad = htmlspecialchars(mb_strimwidth($wpis['tresc'] ?? '', 0, 120, '…'), ENT_QUOTES, 'UTF-8');
-        $html .= '<a href="/wpis/' . $id . '" class="card-title">' . $podglad . '</a>';
+        $kl_usuniety = $usunieto ? ' wpis-usuniety' : '';
+        $html .= '<a href="/wpis/' . $id . '" class="card-title' . $kl_usuniety . '">' . $podglad . '</a>';
     }
     $html .= '</div>';
 
@@ -302,6 +343,9 @@ if (!isset($_GET['strona'])) {
         case 'glosuj_komentarz':
             $_GET['strona'] = 'glosuj_komentarz';
             break;
+        case 'moderuj_komentarz':
+            $_GET['strona'] = 'moderuj_komentarz';
+            break;
         case 'tag':
             $_GET['strona'] = 'tag';
             if ($seg1 !== null && preg_match('/^[\p{L}\p{N}_]+$/u', $seg1)) {
@@ -310,6 +354,9 @@ if (!isset($_GET['strona'])) {
             break;
         case 'admin':
             $_GET['strona'] = 'admin';
+            break;
+        case 'moderuj_wpis':
+            $_GET['strona'] = 'moderuj_wpis';
             break;
         case 'weryfikuj_email':
             $_GET['strona'] = 'weryfikuj_email';
@@ -338,12 +385,12 @@ switch ($strona) {
             $liczba_wpisow = (int)$stmt_licznik->fetchColumn();
 
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania, w.usunieto,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
-                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania, w.usunieto
                  ORDER BY w.data_dodania DESC
                  LIMIT :limit OFFSET :offset'
             );
@@ -370,7 +417,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0);
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']));
             }
             echo '</ul>';
         }
@@ -394,13 +441,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania, w.usunieto,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
                  WHERE w.id = :id
-                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania'
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania, w.usunieto'
             );
             $stmt->execute([':id' => $wpis_id]);
             $wpis = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -420,6 +467,8 @@ switch ($strona) {
         $data              = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
         $liczba_komentarzy = (int)($wpis['liczba_komentarzy'] ?? 0);
         $zalogowany_wpis   = isset($_SESSION['uzytkownik_id']);
+        $usunieto_wpis     = !empty($wpis['usunieto']);
+        $jest_mod_lub_adm  = !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']);
 
         $glos_wpisu = 0;
         if ($zalogowany_wpis) {
@@ -440,27 +489,50 @@ switch ($strona) {
         echo '<div class="card-header">';
         echo '<strong class="card-author">' . $autor . '</strong>';
         echo '<span class="card-date">' . $data . '</span>';
+        if ($jest_mod_lub_adm) {
+            if ($usunieto_wpis) {
+                echo '<form method="post" action="/moderuj_wpis" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="wpis_id" value="' . $wpis_id . '">'
+                   . '<input type="hidden" name="akcja" value="przywroc">'
+                   . '<button type="submit" class="btn-mod btn-mod--przywroc">MODERACJA: PRZYWRÓĆ</button>'
+                   . '</form>';
+            } else {
+                echo '<form method="post" action="/moderuj_wpis" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="wpis_id" value="' . $wpis_id . '">'
+                   . '<input type="hidden" name="akcja" value="usun">'
+                   . '<button type="submit" class="btn-mod btn-mod--usun">MODERACJA: USUŃ</button>'
+                   . '</form>';
+            }
+        }
         echo '</div>';
 
         echo '<div class="card-body article-body">';
-        if ($rodzaj_wpisu === 'link') {
-            $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
-            echo '<p><span class="type-badge type-badge--link">L</span> ' . $tytul . '</p>';
-            if (!empty($wpis['link'])) {
-                $link_raw    = $wpis['link'];
-                $link_schema = strtolower(parse_url($link_raw, PHP_URL_SCHEME) ?: '');
-                if (in_array($link_schema, ['http', 'https'], true)) {
-                    $link = htmlspecialchars($link_raw, ENT_QUOTES, 'UTF-8');
-                    echo '<a href="' . $link . '" class="article-link" rel="noopener noreferrer" target="_blank">' . $link . '</a>';
+        if ($usunieto_wpis && !$jest_mod_lub_adm) {
+            echo '<em class="wpis-usuniety-info">Ten wpis został usunięty przez moderatora</em>';
+        } else {
+            $otwieracz = $usunieto_wpis ? '<div class="wpis-usuniety">' : '';
+            $zamykacz  = $usunieto_wpis ? '</div>' : '';
+            echo $otwieracz;
+            if ($rodzaj_wpisu === 'link') {
+                $tytul = htmlspecialchars($wpis['tytul'] ?? '(bez tytułu)', ENT_QUOTES, 'UTF-8');
+                echo '<p><span class="type-badge type-badge--link">L</span> ' . $tytul . '</p>';
+                if (!empty($wpis['link'])) {
+                    $link_raw    = $wpis['link'];
+                    $link_schema = strtolower(parse_url($link_raw, PHP_URL_SCHEME) ?: '');
+                    if (in_array($link_schema, ['http', 'https'], true)) {
+                        $link = htmlspecialchars($link_raw, ENT_QUOTES, 'UTF-8');
+                        echo '<a href="' . $link . '" class="article-link" rel="noopener noreferrer" target="_blank">' . $link . '</a>';
+                    }
+                }
+                if (!empty($wpis['tresc'])) {
+                    echo '<div class="article-tags">' . parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
+                }
+            } else {
+                if (!empty($wpis['tresc'])) {
+                    echo nl2br(parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')));
                 }
             }
-            if (!empty($wpis['tresc'])) {
-                echo '<div class="article-tags">' . parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')) . '</div>';
-            }
-        } else {
-            if (!empty($wpis['tresc'])) {
-                echo nl2br(parsujTagi(htmlspecialchars($wpis['tresc'], ENT_QUOTES, 'UTF-8')));
-            }
+            echo $zamykacz;
         }
         echo '</div>';
 
@@ -474,13 +546,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, k.rodzic_id, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa AS autor, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
-                 GROUP BY k.id, k.tresc, k.rodzic_id, u.nazwa, k.data_dodania
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -499,7 +571,8 @@ switch ($strona) {
             (isset($_SESSION['uzytkownik_id']) && empty($_SESSION['jest_adminem']))
                 ? sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')
                 : 0.0,
-            $glosy_komentarzy
+            $glosy_komentarzy,
+            !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem'])
         );
         break;
     case 'dodaj':
@@ -885,13 +958,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, k.rodzic_id, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa AS autor, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
-                 GROUP BY k.id, k.tresc, k.rodzic_id, u.nazwa, k.data_dodania
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -903,7 +976,7 @@ switch ($strona) {
 
         $glosy_komentarzy = pobierzGlosyKomentarzy($polaczenie, (int)$_SESSION['uzytkownik_id'], $komentarze);
 
-        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza, $godziny_oczekiwania_komentarz, $glosy_komentarzy);
+        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza, $godziny_oczekiwania_komentarz, $glosy_komentarzy, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']));
         exit;
     case 'glosuj':
         ob_end_clean();
@@ -1000,13 +1073,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania, w.usunieto,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
                  WHERE w.tresc ~* :pattern
-                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania, w.usunieto
                  ORDER BY w.data_dodania DESC'
             );
             $stmt->execute([':pattern' => '(^|[^[:alnum:]_#])#' . $tag_nazwa . '([^[:alnum:]_]|$)']);
@@ -1027,7 +1100,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0);
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']));
             }
             echo '</ul>';
         }
@@ -1170,6 +1243,70 @@ switch ($strona) {
         }
         echo '</section>';
         break;
+    case 'moderuj_wpis':
+        ob_end_clean();
+        if (!isset($_SESSION['uzytkownik_id']) || (empty($_SESSION['jest_adminem']) && empty($_SESSION['jest_moderatorem']))) {
+            http_response_code(403);
+            header('Location: /');
+            exit;
+        }
+
+        $wpis_id = isset($_POST['wpis_id']) ? (int)$_POST['wpis_id'] : 0;
+        $akcja   = $_POST['akcja'] ?? '';
+
+        if ($wpis_id <= 0 || !in_array($akcja, ['usun', 'przywroc'], true)) {
+            http_response_code(400);
+            header('Location: /');
+            exit;
+        }
+
+        try {
+            $stmt = $polaczenie->prepare('UPDATE wpisy SET usunieto = :usunieto WHERE id = :id');
+            $stmt->execute([':usunieto' => ($akcja === 'usun'), ':id' => $wpis_id]);
+        } catch (PDOException $e) {
+            error_log('Błąd moderacji wpisu: ' . $e->getMessage());
+        }
+
+        header('Location: /wpis/' . $wpis_id);
+        exit;
+    case 'moderuj_komentarz':
+        ob_end_clean();
+        if (!isset($_SESSION['uzytkownik_id']) || (empty($_SESSION['jest_adminem']) && empty($_SESSION['jest_moderatorem']))) {
+            http_response_code(403);
+            header('Location: /');
+            exit;
+        }
+
+        $komentarz_id = isset($_POST['komentarz_id']) ? (int)$_POST['komentarz_id'] : 0;
+        $akcja        = $_POST['akcja'] ?? '';
+
+        if ($komentarz_id <= 0 || !in_array($akcja, ['usun', 'przywroc'], true)) {
+            http_response_code(400);
+            header('Location: /');
+            exit;
+        }
+
+        try {
+            $stmt = $polaczenie->prepare('UPDATE komentarze SET usunieto = :usunieto WHERE id = :id');
+            $stmt->execute([':usunieto' => ($akcja === 'usun'), ':id' => $komentarz_id]);
+        } catch (PDOException $e) {
+            error_log('Błąd moderacji komentarza: ' . $e->getMessage());
+        }
+
+        try {
+            $stmt_pobierz_wpis = $polaczenie->prepare('SELECT wpis_id FROM komentarze WHERE id = :id');
+            $stmt_pobierz_wpis->execute([':id' => $komentarz_id]);
+            $wpis_id_redirect = (int)($stmt_pobierz_wpis->fetchColumn() ?: 0);
+        } catch (PDOException $e) {
+            $wpis_id_redirect = 0;
+        }
+
+        if ($wpis_id_redirect > 0) {
+            header('Location: /wpis/' . $wpis_id_redirect);
+        } else {
+            header('Location: /');
+        }
+        exit;
     case 'wyloguj':
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
@@ -1241,13 +1378,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, k.rodzic_id, k.wpis_id, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, k.wpis_id, k.usunieto, u.nazwa AS autor, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.id = :id
-                 GROUP BY k.id, k.tresc, k.rodzic_id, k.wpis_id, u.nazwa, k.data_dodania'
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.wpis_id, k.usunieto, u.nazwa, k.data_dodania'
             );
             $stmt->execute([':id' => $komentarz_id]);
             $komentarz = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1261,8 +1398,10 @@ switch ($strona) {
             break;
         }
 
-        $wpis_id_k    = (int)$komentarz['wpis_id'];
-        $zalogowany_k = isset($_SESSION['uzytkownik_id']);
+        $wpis_id_k       = (int)$komentarz['wpis_id'];
+        $zalogowany_k    = isset($_SESSION['uzytkownik_id']);
+        $jest_mod_k      = !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']);
+        $usunieto_k      = !empty($komentarz['usunieto']);
 
         echo '<p><a href="/wpis/' . $wpis_id_k . '">← Wróć do wpisu</a></p>';
 
@@ -1288,8 +1427,27 @@ switch ($strona) {
         echo '<div class="card-header">';
         echo '<strong class="card-author">' . $k_autor . '</strong>';
         echo '<span class="card-date">' . $k_data . '</span>';
+        if ($jest_mod_k) {
+            if ($usunieto_k) {
+                echo '<form method="post" action="/moderuj_komentarz" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="komentarz_id" value="' . $komentarz_id . '">'
+                   . '<input type="hidden" name="akcja" value="przywroc">'
+                   . '<button type="submit" class="btn-mod btn-mod--przywroc">MODERACJA: PRZYWRÓĆ</button>'
+                   . '</form>';
+            } else {
+                echo '<form method="post" action="/moderuj_komentarz" style="display:inline;margin-left:auto">'
+                   . '<input type="hidden" name="komentarz_id" value="' . $komentarz_id . '">'
+                   . '<input type="hidden" name="akcja" value="usun">'
+                   . '<button type="submit" class="btn-mod btn-mod--usun">MODERACJA: USUŃ</button>'
+                   . '</form>';
+            }
+        }
         echo '</div>';
-        echo '<div class="card-body article-body">' . nl2br(parsujTagi($k_tresc)) . '</div>';
+        if ($usunieto_k && !$jest_mod_k) {
+            echo '<div class="card-body article-body"><em class="wpis-usuniety-info">Ten komentarz został usunięty przez moderatora</em></div>';
+        } else {
+            echo '<div class="card-body article-body' . ($usunieto_k ? ' wpis-usuniety' : '') . '">' . nl2br(parsujTagi($k_tresc)) . '</div>';
+        }
         echo '</div>';
         echo '</div>';
 
@@ -1300,13 +1458,13 @@ switch ($strona) {
                      UNION ALL
                      SELECT k.id FROM komentarze k JOIN poddrzewo p ON k.rodzic_id = p.id
                  )
-                 SELECT k.id, k.tresc, k.rodzic_id, u.nazwa AS autor, k.data_dodania,
+                 SELECT k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa AS autor, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN poddrzewo pd ON pd.id = k.id
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
-                 GROUP BY k.id, k.tresc, k.rodzic_id, u.nazwa, k.data_dodania
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':komentarz_id' => $komentarz_id]);
@@ -1333,7 +1491,7 @@ switch ($strona) {
         if (!empty($dzieci_k[$komentarz_id])) {
             echo '<ul class="comment-list">';
             foreach ($dzieci_k[$komentarz_id] as $dziecko) {
-                echo renderujElementKomentarza($dziecko, $zalogowany_k, $glosy_k, $dzieci_k);
+                echo renderujElementKomentarza($dziecko, $zalogowany_k, $glosy_k, $dzieci_k, 0, $jest_mod_k);
             }
             echo '</ul>';
         }
@@ -1743,6 +1901,18 @@ $tresc = ob_get_clean();
         .btn-danger:hover { background: #c00; color: #fff; }
         .moderator-list { list-style: none; padding: 0; margin: 0.5rem 0 0; }
         .moderator-list li { padding: 3px 0; font-size: 0.9rem; }
+
+        /* ── Moderacja wpisów ── */
+        .btn-mod { font-size: 0.75rem; padding: 1px 4px; cursor: pointer; border: none; background: none; font-family: Verdana, Geneva, sans-serif; }
+        .btn-mod--usun { color: #c00; }
+        .btn-mod--usun:hover { text-decoration: underline; }
+        .btn-mod--przywroc { color: #070; }
+        .btn-mod--przywroc:hover { text-decoration: underline; }
+        .wpis-usuniety { text-decoration: line-through; }
+        .wpis-usuniety:hover { text-decoration: none; }
+        .wpis-usuniety a { text-decoration: line-through; }
+        .wpis-usuniety:hover a { text-decoration: none; }
+        .wpis-usuniety-info { color: #888; font-style: italic; font-size: 0.9rem; }
     </style>
 </head>
 <body>
