@@ -100,3 +100,21 @@ ALTER TABLE komentarze ADD COLUMN IF NOT EXISTS rodzic_id INT REFERENCES komenta
 -- Migracja: rola moderatora
 ALTER TABLE uzytkownicy ADD COLUMN IF NOT EXISTS jest_moderatorem BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Migracja: system moderacji wpisów
+ALTER TABLE wpisy ADD COLUMN IF NOT EXISTS usunieto BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE OR REPLACE VIEW wpisy_z_wynikiem AS
+SELECT
+    w.id,
+    w.tytul,
+    w.tresc,
+    w.link,
+    w.autor_id,
+    w.data_dodania,
+    COALESCE(SUM(g.wartosc), 0) AS wynik,
+    w.rodzaj,
+    w.usunieto
+FROM wpisy w
+LEFT JOIN glosy g ON g.wpis_id = w.id
+GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj, w.usunieto;
+
