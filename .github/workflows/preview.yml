@@ -59,6 +59,7 @@ jobs:
             BAZA_NAZWA=${{ steps.parse-db.outputs.name }}
             BAZA_UZYTKOWNIK=${{ steps.parse-db.outputs.user }}
             BAZA_HASLO=${{ steps.parse-db.outputs.pass }}
+            APP_URL=https://mirkovibe-pr-${{ github.event.pull_request.number }}.fly.dev
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_ORG: ${{ secrets.FLY_ORG }}
