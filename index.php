@@ -1501,7 +1501,12 @@ $tresc = ob_get_clean();
 
         .comment-list--zagniezdzone {
             list-style: none;
-            margin-left: 44px;
+            margin-left: 2rem;
+        }
+
+        .comment-list--zagniezdzone > .comment-item {
+            margin-left: 0;
+            padding-left: 0;
         }
 
         .comment-item {
