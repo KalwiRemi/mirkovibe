@@ -94,6 +94,17 @@ ALTER TABLE wpisy ADD COLUMN IF NOT EXISTS usunieto BOOLEAN NOT NULL DEFAULT FAL
 -- Migracja: system moderacji komentarzy
 ALTER TABLE komentarze ADD COLUMN IF NOT EXISTS usunieto BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Migracja: indeksy dla wydajności
+CREATE INDEX IF NOT EXISTS wpisy_autor_id_idx ON wpisy (autor_id);
+CREATE INDEX IF NOT EXISTS wpisy_data_dodania_idx ON wpisy (data_dodania DESC);
+
+CREATE INDEX IF NOT EXISTS komentarze_wpis_id_idx ON komentarze (wpis_id);
+CREATE INDEX IF NOT EXISTS komentarze_autor_id_idx ON komentarze (autor_id);
+CREATE INDEX IF NOT EXISTS komentarze_rodzic_id_idx ON komentarze (rodzic_id);
+
+CREATE INDEX IF NOT EXISTS glosy_wpis_id_idx ON glosy (wpis_id);
+CREATE INDEX IF NOT EXISTS glosy_komentarz_id_idx ON glosy (komentarz_id);
+
 CREATE VIEW wpisy_z_wynikiem AS
 SELECT
     w.id,
