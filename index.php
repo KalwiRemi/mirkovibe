@@ -583,7 +583,7 @@ switch ($strona) {
                             . $link_weryfikacji . "\n\n"
                             . "Link jest ważny przez 24 godziny.\n\n"
                             . "Jeśli nie zakładałeś/aś konta w serwisie Mirkovibe, zignoruj tę wiadomość.";
-                        $naglowki = 'From: noreply@' . (parse_url(APP_URL, PHP_URL_HOST) ?? 'mirkovibe') . "\r\n"
+                        $naglowki = 'From: ' . (getenv('SMTP_FROM') ?: 'noreply@' . (parse_url(APP_URL, PHP_URL_HOST) ?? 'mirkovibe')) . "\r\n"
                             . 'Content-Type: text/plain; charset=UTF-8' . "\r\n";
                         $wyslano = mail($email_wpisany, $temat, $tresc_email, $naglowki);
                         if (!$wyslano) {
