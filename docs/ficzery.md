@@ -115,9 +115,13 @@ Zalogowani użytkownicy mogą dodawać komentarze do wpisów. Komentarz:
 
 > **Uwaga:** Nowi użytkownicy muszą poczekać określony czas po rejestracji, zanim będą mogli dodać komentarz. Domyślnie jest to **1 godzina**. Jeśli czas jeszcze nie upłynął, wyświetlana jest informacja „Możesz dodać komentarz za X godzin".
 
-Lista komentarzy jest wyświetlana chronologicznie (od najstarszego). Każdy komentarz pokazuje autora, datę, treść oraz aktualny wynik głosowania.
+Komentarze są **zagnieżdżone** – wyświetlane jako drzewo. Każdy komentarz może mieć dowolną liczbę odpowiedzi, a każda odpowiedź może być zagnieżdżona kolejny poziom głębiej (do 10 poziomów). Wcięcia i pionowa linia po lewej stronie wizualizują głębokość zagnieżdżenia.
 
-Dodawanie komentarzy odbywa się bez przeładowania strony dzięki **htmx**.
+Przy każdym komentarzu widoczny jest link **odpowiedz**, który przenosi użytkownika na dedykowaną stronę komentarza (`/komentarz/{id}`). Na tej stronie wyświetlane są: treść komentarza, istniejące odpowiedzi (jako drzewo) oraz formularz dodania odpowiedzi.
+
+Dodawanie komentarzy do wpisów (na poziomie głównym) odbywa się bez przeładowania strony dzięki **htmx**.
+
+**URL strony komentarza:** `/komentarz/{id}`
 
 ---
 
