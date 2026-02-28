@@ -16,8 +16,8 @@ from ${SMTP_FROM:-noreply@mirkovibe.fly.dev}
 user ${SMTP_USER:-}
 password ${SMTP_PASS:-}
 EOF
-    chown root:www-data /etc/msmtprc
-    chmod 640 /etc/msmtprc
+    chown www-data:www-data /etc/msmtprc
+    chmod 600 /etc/msmtprc
     echo 'sendmail_path = "/usr/bin/msmtp --file=/etc/msmtprc -t --read-envelope-from"' > /usr/local/etc/php/conf.d/mail.ini
 else
     echo "UWAGA: Zmienna SMTP_HOST nie jest ustawiona. Wysyłanie emaili jest wyłączone." >&2
