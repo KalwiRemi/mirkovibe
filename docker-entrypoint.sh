@@ -17,7 +17,7 @@ user ${SMTP_USER:-}
 password ${SMTP_PASS:-}
 EOF
     chmod 600 /etc/msmtprc
-    echo 'sendmail_path = "/usr/bin/msmtp -t --read-envelope-from"' > /usr/local/etc/php/conf.d/mail.ini
+    echo 'sendmail_path = "/usr/bin/msmtp --file=/etc/msmtprc -t --read-envelope-from"' > /usr/local/etc/php/conf.d/mail.ini
 else
     echo "UWAGA: Zmienna SMTP_HOST nie jest ustawiona. Wysyłanie emaili jest wyłączone." >&2
 fi
