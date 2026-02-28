@@ -68,8 +68,6 @@ Wpisy są stronicowane – na jednej stronie wyświetla się **10 wpisów**. Naw
 
 Zalogowany użytkownik może dodać jeden z dwóch rodzajów wpisów. Na stronie dostępny jest przełącznik między trybami:
 
-> **Uwaga:** Nowi użytkownicy muszą poczekać określony czas po rejestracji, zanim będą mogli dodać wpis. Domyślnie jest to **12 godzin**. Jeśli czas jeszcze nie upłynął, wyświetlana jest informacja „Możesz dodać wpis za X godzin".
-
 ### Wpis
 Zwykły wpis tekstowy. Wymagane:
 - **Treść** – wymagana (bez tytułu i URL).
@@ -111,8 +109,6 @@ Zalogowani użytkownicy mogą dodawać komentarze do wpisów. Komentarz:
 - Musi mieć treść.
 - Nie może przekraczać **2000 znaków**.
 
-> **Uwaga:** Nowi użytkownicy muszą poczekać określony czas po rejestracji, zanim będą mogli dodać komentarz. Domyślnie jest to **1 godzina**. Jeśli czas jeszcze nie upłynął, wyświetlana jest informacja „Możesz dodać komentarz za X godzin".
-
 Lista komentarzy jest wyświetlana chronologicznie (od najstarszego). Każdy komentarz pokazuje autora, datę, treść oraz aktualny wynik głosowania.
 
 Dodawanie komentarzy odbywa się bez przeładowania strony dzięki **htmx**.
@@ -147,8 +143,6 @@ Administrator to specjalny rodzaj użytkownika z rozszerzonymi uprawnieniami. Li
 
 W panelu administrator może:
 - **Włączyć lub wyłączyć rejestrację** – checkbox „Rejestracja włączona". Gdy rejestracja jest wyłączona, strona `/rejestracja` wyświetla komunikat „Rejestracja wyłączona" dla zwykłych użytkowników.
-- **Ustawić minimalny czas przed dodaniem wpisu** – pole liczbowe „Minimalny czas przed dodaniem wpisu (godz.)". Domyślnie **12 godzin**.
-- **Ustawić minimalny czas przed dodaniem komentarza** – pole liczbowe „Minimalny czas przed dodaniem komentarza (godz.)". Domyślnie **1 godzina**.
 
 Dostęp do panelu wymaga zalogowania jako administrator. Próba wejścia bez uprawnień zwraca błąd 403.
 

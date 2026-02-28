@@ -6,12 +6,10 @@ define('BAZA_HOST',            getenv('BAZA_HOST')            ?: 'localhost');
 define('BAZA_NAZWA',           getenv('BAZA_NAZWA')           ?: 'mirkovibe');
 define('BAZA_UZYTKOWNIK',      getenv('BAZA_UZYTKOWNIK')      ?: 'postgres');
 define('BAZA_HASLO',           getenv('BAZA_HASLO')           ?: '');
-define('NAZWA_ADMINISTRATORA', getenv('NAZWA_ADMINISTRATORA') ?: '');
 define('APP_URL', rtrim(getenv('APP_URL') ?:
     ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'),
     '/'));
-define('DOMYSLNY_CZAS_WPISU',       12);
-define('DOMYSLNY_CZAS_KOMENTARZA',   1);
+define('NAZWA_ADMINISTRATORA', getenv('NAZWA_ADMINISTRATORA') ?: '');
 
 try {
     $polaczenie = new PDO(
@@ -29,38 +27,7 @@ header('Content-Type: text/html; charset=UTF-8');
 
 $dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin', 'weryfikuj_email'];
 
-function formatujCzasOczekiwania(float $godziny): string {
-    if ($godziny < 1) {
-        $minuty = (int)ceil($godziny * 60);
-        if ($minuty === 1) return '1 minutę';
-        if ($minuty <= 4) return $minuty . ' minuty';
-        return $minuty . ' minut';
-    }
-    $h = (int)ceil($godziny);
-    if ($h === 1) return '1 godzinę';
-    if ($h <= 4) return $h . ' godziny';
-    return $h . ' godzin';
-}
-
-function sprawdzKarencje(PDO $polaczenie, int $uzytkownik_id, string $typ): float {
-    $klucz    = $typ === 'wpis' ? 'minimalny_czas_wpisu' : 'minimalny_czas_komentarza';
-    $domyslna = $typ === 'wpis' ? (string)DOMYSLNY_CZAS_WPISU : (string)DOMYSLNY_CZAS_KOMENTARZA;
-    try {
-        $stmt_cfg = $polaczenie->prepare('SELECT wartosc FROM konfiguracja WHERE klucz = :klucz');
-        $stmt_cfg->execute([':klucz' => $klucz]);
-        $minimalny_czas = (int)($stmt_cfg->fetchColumn() ?: $domyslna);
-        $stmt_usr = $polaczenie->prepare('SELECT data_rejestracji FROM uzytkownicy WHERE id = :id');
-        $stmt_usr->execute([':id' => $uzytkownik_id]);
-        $data_rejestracji = $stmt_usr->fetchColumn();
-        $godziny_od_rejestracji = (time() - strtotime($data_rejestracji)) / 3600;
-        return max(0.0, $minimalny_czas - $godziny_od_rejestracji);
-    } catch (PDOException $e) {
-        error_log('Błąd sprawdzania karencji: ' . $e->getMessage());
-        return 0.0;
-    }
-}
-
-function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0): string {
+function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = ''): string {
     $html  = '<div id="komentarze-sekcja">';
     $html .= '<section class="comments-section">';
     $html .= '<h2>Komentarze (' . count($komentarze) . ')</h2>';
@@ -93,19 +60,15 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     $html .= '</section>';
 
     if ($zalogowany) {
-        if ($godziny_oczekiwania > 0) {
-            $html .= '<p class="empty-state">Możesz dodać komentarz za ' . formatujCzasOczekiwania($godziny_oczekiwania) . '.</p>';
-        } else {
-            $akcja = '/dodaj_komentarz/' . $wpis_id;
-            $html .= '<form method="post" class="form-stack form-stack--comment"'
-                   . ' hx-post="' . $akcja . '" hx-target="#komentarze-sekcja" hx-swap="outerHTML">';
-            if ($blad !== '') {
-                $html .= '<ul class="error-list"><li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li></ul>';
-            }
-            $html .= '<textarea name="tresc" placeholder="Dodaj komentarz..." rows="3" maxlength="2000" required></textarea>';
-            $html .= '<button type="submit" class="btn-primary">Wyślij komentarz</button>';
-            $html .= '</form>';
+        $akcja = '/dodaj_komentarz/' . $wpis_id;
+        $html .= '<form method="post" class="form-stack form-stack--comment"'
+               . ' hx-post="' . $akcja . '" hx-target="#komentarze-sekcja" hx-swap="outerHTML">';
+        if ($blad !== '') {
+            $html .= '<ul class="error-list"><li>' . htmlspecialchars($blad, ENT_QUOTES, 'UTF-8') . '</li></ul>';
         }
+        $html .= '<textarea name="tresc" placeholder="Dodaj komentarz..." rows="3" maxlength="2000" required></textarea>';
+        $html .= '<button type="submit" class="btn-primary">Wyślij komentarz</button>';
+        $html .= '</form>';
     }
 
     $html .= '</div>';
@@ -363,26 +326,12 @@ switch ($strona) {
             $komentarze = [];
         }
 
-        echo renderujKomentarze($komentarze, $wpis_id, isset($_SESSION['uzytkownik_id']),
-            '',
-            (isset($_SESSION['uzytkownik_id']) && empty($_SESSION['jest_adminem']))
-                ? sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')
-                : 0.0
-        );
+        echo renderujKomentarze($komentarze, $wpis_id, isset($_SESSION['uzytkownik_id']));
         break;
     case 'dodaj':
         if (!isset($_SESSION['uzytkownik_id'])) {
             header('Location: /logowanie');
             exit;
-        }
-
-        if (empty($_SESSION['jest_adminem'])) {
-            $godziny_oczekiwania_wpis = sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'wpis');
-            if ($godziny_oczekiwania_wpis > 0) {
-                echo '<h1>Dodaj wpis</h1>';
-                echo '<p class="empty-state">Możesz dodać wpis za ' . formatujCzasOczekiwania($godziny_oczekiwania_wpis) . '.</p>';
-                break;
-            }
         }
 
         $bledy = [];
@@ -695,15 +644,9 @@ switch ($strona) {
             exit;
         }
 
-        $godziny_oczekiwania_komentarz = empty($_SESSION['jest_adminem'])
-            ? sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')
-            : 0.0;
-
         $blad_komentarza   = '';
         $tresc_komentarza  = trim($_POST['tresc'] ?? '');
-        if ($godziny_oczekiwania_komentarz > 0) {
-            $blad_komentarza = '';
-        } elseif (!empty($tresc_komentarza)) {
+        if (!empty($tresc_komentarza)) {
             if (strlen($tresc_komentarza) > 2000) {
                 $blad_komentarza = 'Komentarz nie może przekraczać 2000 znaków.';
             } else {
@@ -742,7 +685,7 @@ switch ($strona) {
             $komentarze = [];
         }
 
-        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza, $godziny_oczekiwania_komentarz);
+        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza);
         exit;
     case 'glosuj':
         ob_end_clean();
@@ -912,15 +855,9 @@ switch ($strona) {
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nowa_wartosc = (isset($_POST['rejestracja_wlaczona']) && $_POST['rejestracja_wlaczona'] === '1') ? 'true' : 'false';
-            $czas_wpisu       = max(0, (int)($_POST['minimalny_czas_wpisu']       ?? DOMYSLNY_CZAS_WPISU));
-            $czas_komentarza  = max(0, (int)($_POST['minimalny_czas_komentarza']  ?? DOMYSLNY_CZAS_KOMENTARZA));
             try {
                 $stmt_upd = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'rejestracja_wlaczona'");
                 $stmt_upd->execute([':wartosc' => $nowa_wartosc]);
-                $stmt_upd2 = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'minimalny_czas_wpisu'");
-                $stmt_upd2->execute([':wartosc' => (string)$czas_wpisu]);
-                $stmt_upd3 = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'minimalny_czas_komentarza'");
-                $stmt_upd3->execute([':wartosc' => (string)$czas_komentarza]);
                 $komunikat_admina = 'Konfiguracja została zapisana.';
             } catch (PDOException $e) {
                 error_log('Błąd zapisu konfiguracji: ' . $e->getMessage());
@@ -928,16 +865,11 @@ switch ($strona) {
             }
         }
 
-        $rejestracja_wlaczona_cfg    = false;
-        $minimalny_czas_wpisu_cfg    = DOMYSLNY_CZAS_WPISU;
-        $minimalny_czas_komentarza_cfg = DOMYSLNY_CZAS_KOMENTARZA;
+        $rejestracja_wlaczona_cfg = false;
         try {
-            $stmt_cfg2 = $polaczenie->query("SELECT klucz, wartosc FROM konfiguracja WHERE klucz IN ('rejestracja_wlaczona','minimalny_czas_wpisu','minimalny_czas_komentarza')");
-            foreach ($stmt_cfg2->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                if ($row['klucz'] === 'rejestracja_wlaczona')    $rejestracja_wlaczona_cfg    = ($row['wartosc'] === 'true');
-                if ($row['klucz'] === 'minimalny_czas_wpisu')    $minimalny_czas_wpisu_cfg    = (int)$row['wartosc'];
-                if ($row['klucz'] === 'minimalny_czas_komentarza') $minimalny_czas_komentarza_cfg = (int)$row['wartosc'];
-            }
+            $stmt_cfg2 = $polaczenie->prepare("SELECT wartosc FROM konfiguracja WHERE klucz = 'rejestracja_wlaczona'");
+            $stmt_cfg2->execute();
+            $rejestracja_wlaczona_cfg = ($stmt_cfg2->fetchColumn() === 'true');
         } catch (PDOException $e) {
             error_log('Błąd odczytu konfiguracji: ' . $e->getMessage());
         }
@@ -947,18 +879,11 @@ switch ($strona) {
             echo '<p class="admin-msg">' . htmlspecialchars($komunikat_admina, ENT_QUOTES, 'UTF-8') . '</p>';
         }
         echo '<section class="admin-section">';
-        echo '<form method="post" class="form-stack">';
         echo '<h2>Ustawienia rejestracji</h2>';
+        echo '<form method="post" class="form-stack">';
         echo '<label class="admin-label">';
         echo '<input type="checkbox" name="rejestracja_wlaczona" value="1"' . ($rejestracja_wlaczona_cfg ? ' checked' : '') . '>';
         echo ' Rejestracja włączona';
-        echo '</label>';
-        echo '<h2>Karencja dla nowych użytkowników</h2>';
-        echo '<label class="admin-label">Minimalny czas przed dodaniem wpisu (godz.):';
-        echo '<input type="number" name="minimalny_czas_wpisu" value="' . $minimalny_czas_wpisu_cfg . '" min="0" style="width:80px;margin-left:0.5rem">';
-        echo '</label>';
-        echo '<label class="admin-label">Minimalny czas przed dodaniem komentarza (godz.):';
-        echo '<input type="number" name="minimalny_czas_komentarza" value="' . $minimalny_czas_komentarza_cfg . '" min="0" style="width:80px;margin-left:0.5rem">';
         echo '</label>';
         echo '<button type="submit" class="btn-primary">Zapisz</button>';
         echo '</form>';
