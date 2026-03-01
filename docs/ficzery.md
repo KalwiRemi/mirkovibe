@@ -133,11 +133,15 @@ Dodawanie komentarzy do wpisów (na poziomie głównym) odbywa się bez przeład
 
 Zalogowani użytkownicy mogą głosować na wpisy przyciskami `▲` i `▼`. Każdy użytkownik może oddać jeden głos na dany wpis (zmiana głosu jest możliwa). Wynik jest aktualizowany bez przeładowania strony dzięki **htmx**.
 
+Po najechaniu myszką na wynik głosowania wyświetlane jest okienko z listą użytkowników, którzy oddali głos, wraz z wartością głosu (`+1` lub `-1`). Lista jest ładowana leniwie – zapytanie do bazy danych wykonywane jest dopiero przy pierwszym najechaniu myszką.
+
 ---
 
 ## 9. Głosowanie na komentarze
 
 Zalogowani użytkownicy mogą głosować na komentarze przyciskami `+` i `−`. Każdy użytkownik może oddać jeden głos na dany komentarz (zmiana głosu jest możliwa). Wynik jest aktualizowany bez przeładowania strony dzięki **htmx**.
+
+Po najechaniu myszką na wynik głosowania komentarza wyświetlane jest okienko z listą użytkowników, którzy oddali głos, wraz z wartością głosu (`+1` lub `-1`). Lista jest ładowana leniwie – analogicznie jak dla wpisów.
 
 ---
 

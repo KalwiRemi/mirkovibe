@@ -29,7 +29,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'tag', 'admin', 'weryfikuj_email', 'komentarz', 'moderuj_wpis', 'moderuj_komentarz'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'glosy_wpisu', 'tag', 'admin', 'weryfikuj_email', 'komentarz', 'moderuj_wpis', 'moderuj_komentarz'];
 
 function formatujCzasOczekiwania(float $godziny): string {
     if ($godziny < 1) {
@@ -143,7 +143,12 @@ function renderujSekcjeGlosow(string $typ, int $id, int $wynik, bool $zalogowany
     } else {
         $html .= '<span class="vote-icon">▲</span>';
     }
+    $id_tooltip = 'tooltip-' . $typ . '-' . $id;
+    $pole_glosy = $typ === 'wpis' ? 'wpis_id' : 'komentarz_id';
+    $html .= '<span class="score-wrapper" hx-get="/glosy_wpisu?' . $pole_glosy . '=' . $id . '" hx-trigger="mouseenter once" hx-target="#' . $id_tooltip . '" hx-swap="innerHTML">';
     $html .= '<span id="' . $id_wyniku . '" class="score">' . $wynik . '</span>';
+    $html .= '<div id="' . $id_tooltip . '" class="glosy-tooltip"></div>';
+    $html .= '</span>';
     if ($zalogowany && !$jest_autorem) {
         $klasa_down = 'btn-vote down' . ($glos_uzytkownika === -1 ? ' active' : '');
         $html .= '<button type="button" class="' . $klasa_down . '" hx-post="' . $trasa . '" hx-target="#' . $id_sekcji . '" hx-swap="outerHTML" hx-vals=\'{"' . $pole_id . '":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
@@ -379,6 +384,9 @@ if (!isset($_GET['strona'])) {
             break;
         case 'glosuj_komentarz':
             $_GET['strona'] = 'glosuj_komentarz';
+            break;
+        case 'glosy_wpisu':
+            $_GET['strona'] = 'glosy_wpisu';
             break;
         case 'moderuj_komentarz':
             $_GET['strona'] = 'moderuj_komentarz';
@@ -1128,6 +1136,50 @@ switch ($strona) {
         } catch (PDOException $e) {
             error_log('Błąd głosowania na komentarz: ' . $e->getMessage());
             http_response_code(500);
+        }
+        exit;
+    case 'glosy_wpisu':
+        ob_end_clean();
+        $wpis_id_g      = isset($_GET['wpis_id'])      ? (int)$_GET['wpis_id']      : 0;
+        $komentarz_id_g = isset($_GET['komentarz_id']) ? (int)$_GET['komentarz_id'] : 0;
+
+        if ($wpis_id_g <= 0 && $komentarz_id_g <= 0) {
+            http_response_code(400);
+            echo '<em>Brak wymaganego parametru wpis_id lub komentarz_id</em>';
+            exit;
+        }
+
+        try {
+            if ($wpis_id_g > 0) {
+                $stmt_gv = $polaczenie->prepare(
+                    'SELECT u.nazwa, g.wartosc FROM glosy g
+                     JOIN uzytkownicy u ON u.id = g.uzytkownik_id
+                     WHERE g.wpis_id = :id ORDER BY g.wartosc DESC, u.nazwa ASC'
+                );
+                $stmt_gv->execute([':id' => $wpis_id_g]);
+            } else {
+                $stmt_gv = $polaczenie->prepare(
+                    'SELECT u.nazwa, g.wartosc FROM glosy g
+                     JOIN uzytkownicy u ON u.id = g.uzytkownik_id
+                     WHERE g.komentarz_id = :id ORDER BY g.wartosc DESC, u.nazwa ASC'
+                );
+                $stmt_gv->execute([':id' => $komentarz_id_g]);
+            }
+            $glosy_lista = $stmt_gv->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($glosy_lista)) {
+                echo '<em>Brak głosów</em>';
+            } else {
+                echo '<ul class="glosy-lista">';
+                foreach ($glosy_lista as $g) {
+                    $wartosc_tekst = (int)$g['wartosc'] === 1 ? '+1' : '-1';
+                    $klasa_g = (int)$g['wartosc'] === 1 ? 'glos-plus' : 'glos-minus';
+                    echo '<li><span class="' . $klasa_g . '">' . $wartosc_tekst . '</span> ' . htmlspecialchars($g['nazwa'], ENT_QUOTES, 'UTF-8') . '</li>';
+                }
+                echo '</ul>';
+            }
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania głosujących: ' . $e->getMessage());
+            echo '<em>Nie udało się pobrać listy głosujących</em>';
         }
         exit;
     case 'tag':
@@ -2000,6 +2052,29 @@ $tresc = ob_get_clean();
         .wpis-usuniety a { text-decoration: line-through; }
         .wpis-usuniety:hover a { text-decoration: none; }
         .wpis-usuniety-info { color: #888; font-style: italic; font-size: 0.9rem; }
+
+        /* ── Tooltip głosujących ── */
+        .score-wrapper { position: relative; cursor: default; }
+        .glosy-tooltip {
+            display: none;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 100%;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 4px 8px;
+            font-size: 0.78rem;
+            z-index: 20;
+            min-width: 110px;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .score-wrapper:hover .glosy-tooltip { display: block; }
+        .glosy-lista { list-style: none; margin: 0; padding: 0; }
+        .glosy-lista li { padding: 1px 0; }
+        .glos-plus { color: #060; font-weight: bold; }
+        .glos-minus { color: #c00; font-weight: bold; }
     </style>
 </head>
 <body>
