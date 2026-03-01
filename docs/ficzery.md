@@ -195,6 +195,36 @@ Moderatorzy (i administratorzy) mogą usuwać i przywracać wpisy oraz komentarz
 
 ---
 
+## 13. Zgłaszanie wpisów i komentarzy
+
+Zalogowani użytkownicy mogą zgłaszać wpisy i komentarze naruszające zasady serwisu.
+
+- Przycisk **zgłoś** widoczny jest obok przycisku „odpowiedz" w stopce każdego wpisu i komentarza (tylko dla zalogowanych użytkowników).
+- Po kliknięciu przycisku wpis/komentarz zostaje zgłoszony do moderacji, a użytkownik widzi potwierdzenie „**Dziękujemy za zgłoszenie**" (bez przeładowania strony, dzięki htmx).
+- Każdy użytkownik może zgłosić dany wpis lub komentarz tylko raz.
+
+**URL akcji zgłoszenia:** `/zglos` (POST)
+
+---
+
+## 14. Panel moderatora
+
+Moderatorzy i administratorzy mają dostęp do panelu moderatora z listą zgłoszonych wpisów i komentarzy.
+
+- Link **Moderacja** widoczny jest w nawigacji dla moderatorów i administratorów.
+- Lista zgłoszeń zawiera: typ (wpis/komentarz), autora, datę dodania, liczbę zgłoszeń, datę ostatniego zgłoszenia, podgląd treści oraz przyciski **MODERACJA: USUŃ/PRZYWRÓĆ**.
+- Wyniki można sortować według:
+  - **Najnowsze** (domyślnie) – według daty ostatniego zgłoszenia malejąco
+  - **Najstarsze** – według daty pierwszego zgłoszenia rosnąco
+  - **Najczęściej zgłaszane** – według liczby zgłoszeń malejąco
+  - **Wymoderowane** – tylko elementy oznaczone jako usunięte, posortowane od najnowszego zgłoszenia
+
+Dostęp do panelu wymaga zalogowania jako moderator lub administrator. Próba wejścia bez uprawnień zwraca błąd 403.
+
+**URL:** `/panel_moderatora`
+
+---
+
 ## Techniczny stack
 
 - **PHP** – logika aplikacji (jeden plik: `index.php`)

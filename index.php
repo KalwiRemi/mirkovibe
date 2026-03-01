@@ -29,7 +29,7 @@ try {
 
 header('Content-Type: text/html; charset=UTF-8');
 
-$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'glosy_wpisu', 'tag', 'admin', 'weryfikuj_email', 'komentarz', 'moderuj_wpis', 'moderuj_komentarz'];
+$dozwolone_strony = ['glowna', 'wpis', 'dodaj', 'logowanie', 'rejestracja', 'wyloguj', 'dodaj_komentarz', 'glosuj', 'glosuj_komentarz', 'glosy_wpisu', 'tag', 'admin', 'weryfikuj_email', 'komentarz', 'moderuj_wpis', 'moderuj_komentarz', 'zglos', 'panel_moderatora'];
 
 function formatujCzasOczekiwania(float $godziny): string {
     if ($godziny < 1) {
@@ -200,6 +200,12 @@ function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $gl
     }
     $html .= '<div class="card-footer">';
     $html .= '<a href="/komentarz/' . $k_id . '" class="card-meta-link card-meta-link--reply">odpowiedz</a>';
+    if ($zalogowany) {
+        $zglos_id_k = 'zglos-komentarz-' . $k_id;
+        $html .= '<span id="' . $zglos_id_k . '">'
+               . '<button type="button" class="btn-zglos" hx-post="/zglos" hx-vals=\'{"komentarz_id":"' . $k_id . '"}\' hx-target="#' . $zglos_id_k . '" hx-swap="outerHTML">zgłoś</button>'
+               . '</span>';
+    }
     $html .= '</div>';
     $html .= '</div>';
     $html .= '</div>';
@@ -322,6 +328,12 @@ function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika
     $html .= '<div class="card-footer">';
     $html .= '<a href="/wpis/' . $id . '" class="card-meta-link">komentarze (' . $komentarze . ')</a>';
     $html .= '<a href="/wpis/' . $id . '" class="card-meta-link card-meta-link--reply">odpowiedz</a>';
+    if ($zalogowany) {
+        $zglos_id = 'zglos-wpis-' . $id;
+        $html .= '<span id="' . $zglos_id . '">'
+               . '<button type="button" class="btn-zglos" hx-post="/zglos" hx-vals=\'{"wpis_id":"' . $id . '"}\' hx-target="#' . $zglos_id . '" hx-swap="outerHTML">zgłoś</button>'
+               . '</span>';
+    }
     $html .= '</div>';
 
     $html .= '</div>';
@@ -390,6 +402,12 @@ if (!isset($_GET['strona'])) {
             break;
         case 'moderuj_komentarz':
             $_GET['strona'] = 'moderuj_komentarz';
+            break;
+        case 'zglos':
+            $_GET['strona'] = 'zglos';
+            break;
+        case 'panel_moderatora':
+            $_GET['strona'] = 'panel_moderatora';
             break;
         case 'tag':
             $_GET['strona'] = 'tag';
@@ -585,6 +603,12 @@ switch ($strona) {
         echo '<div class="card-footer">';
         echo '<a href="#komentarze-sekcja" class="card-meta-link">komentarze (' . $liczba_komentarzy . ')</a>';
         echo '<a href="#komentarze-sekcja" class="card-meta-link card-meta-link--reply">odpowiedz</a>';
+        if ($zalogowany_wpis) {
+            $zglos_id_w = 'zglos-wpis-' . $wpis_id;
+            echo '<span id="' . $zglos_id_w . '">'
+               . '<button type="button" class="btn-zglos" hx-post="/zglos" hx-vals=\'{"wpis_id":"' . $wpis_id . '"}\' hx-target="#' . $zglos_id_w . '" hx-swap="outerHTML">zgłoś</button>'
+               . '</span>';
+        }
         echo '</div>';
 
         echo '</div>';
@@ -1445,6 +1469,209 @@ switch ($strona) {
             header('Location: /');
         }
         exit;
+    case 'zglos':
+        ob_end_clean();
+        if (!isset($_SESSION['uzytkownik_id'])) {
+            http_response_code(403);
+            exit;
+        }
+
+        $zglos_wpis_id      = isset($_POST['wpis_id'])      ? (int)$_POST['wpis_id']      : 0;
+        $zglos_komentarz_id = isset($_POST['komentarz_id']) ? (int)$_POST['komentarz_id'] : 0;
+
+        if ($zglos_wpis_id <= 0 && $zglos_komentarz_id <= 0) {
+            http_response_code(400);
+            exit;
+        }
+
+        $zglos_span_id = '';
+        try {
+            if ($zglos_wpis_id > 0) {
+                $stmt_zglos = $polaczenie->prepare(
+                    'INSERT INTO zgloszenia (wpis_id, uzytkownik_id) VALUES (:wpis_id, :uzytkownik_id)
+                     ON CONFLICT DO NOTHING'
+                );
+                $stmt_zglos->execute([
+                    ':wpis_id'       => $zglos_wpis_id,
+                    ':uzytkownik_id' => $_SESSION['uzytkownik_id'],
+                ]);
+                $zglos_span_id = 'zglos-wpis-' . $zglos_wpis_id;
+            } else {
+                $stmt_zglos = $polaczenie->prepare(
+                    'INSERT INTO zgloszenia (komentarz_id, uzytkownik_id) VALUES (:komentarz_id, :uzytkownik_id)
+                     ON CONFLICT DO NOTHING'
+                );
+                $stmt_zglos->execute([
+                    ':komentarz_id'  => $zglos_komentarz_id,
+                    ':uzytkownik_id' => $_SESSION['uzytkownik_id'],
+                ]);
+                $zglos_span_id = 'zglos-komentarz-' . $zglos_komentarz_id;
+            }
+        } catch (PDOException $e) {
+            error_log('Błąd zgłoszenia: ' . $e->getMessage());
+        }
+
+        if (!empty($_SERVER['HTTP_HX_REQUEST'])) {
+            echo '<span id="' . htmlspecialchars($zglos_span_id, ENT_QUOTES, 'UTF-8') . '" class="zglos-potwierdzenie">Dziękujemy za zgłoszenie</span>';
+        } else {
+            $referer = $_SERVER['HTTP_REFERER'] ?? '/';
+            header('Location: ' . $referer);
+        }
+        exit;
+    case 'panel_moderatora':
+        if (!isset($_SESSION['uzytkownik_id']) || (empty($_SESSION['jest_adminem']) && empty($_SESSION['jest_moderatorem']))) {
+            http_response_code(403);
+            echo '<h1>Panel moderatora</h1>';
+            echo '<p>Brak dostępu.</p>';
+            break;
+        }
+
+        $sortowanie = $_GET['sortowanie'] ?? 'najnowsze';
+        if (!in_array($sortowanie, ['najnowsze', 'najstarsze', 'najczesciej', 'wymoderowane'], true)) {
+            $sortowanie = 'najnowsze';
+        }
+
+        $warunek_usunieto = $sortowanie === 'wymoderowane' ? 'AND dane.usunieto = TRUE' : '';
+
+        switch ($sortowanie) {
+            case 'najstarsze':
+                $order_sql = 'ORDER BY dane.pierwsze_zgloszenie ASC';
+                break;
+            case 'najczesciej':
+                $order_sql = 'ORDER BY dane.liczba_zgloszen DESC, dane.ostatnie_zgloszenie DESC';
+                break;
+            default:
+                $order_sql = 'ORDER BY dane.ostatnie_zgloszenie DESC';
+                break;
+        }
+
+        $zgloszenia_lista = [];
+        try {
+            $stmt_zgloszone = $polaczenie->query(
+                'SELECT * FROM (
+                    SELECT
+                        \'wpis\' AS typ,
+                        w.id,
+                        w.id AS wpis_powiazany_id,
+                        w.tresc,
+                        w.data_dodania,
+                        w.usunieto,
+                        u.nazwa AS autor,
+                        w.autor_id,
+                        COUNT(z.id) AS liczba_zgloszen,
+                        MAX(z.data_zgloszenia) AS ostatnie_zgloszenie,
+                        MIN(z.data_zgloszenia) AS pierwsze_zgloszenie
+                    FROM zgloszenia z
+                    JOIN wpisy w ON w.id = z.wpis_id
+                    JOIN uzytkownicy u ON u.id = w.autor_id
+                    WHERE z.wpis_id IS NOT NULL
+                    GROUP BY w.id, w.tresc, w.data_dodania, w.usunieto, u.nazwa, w.autor_id
+                    UNION ALL
+                    SELECT
+                        \'komentarz\' AS typ,
+                        k.id,
+                        k.wpis_id AS wpis_powiazany_id,
+                        k.tresc,
+                        k.data_dodania,
+                        k.usunieto,
+                        u.nazwa AS autor,
+                        k.autor_id,
+                        COUNT(z.id) AS liczba_zgloszen,
+                        MAX(z.data_zgloszenia) AS ostatnie_zgloszenie,
+                        MIN(z.data_zgloszenia) AS pierwsze_zgloszenie
+                    FROM zgloszenia z
+                    JOIN komentarze k ON k.id = z.komentarz_id
+                    JOIN uzytkownicy u ON u.id = k.autor_id
+                    WHERE z.komentarz_id IS NOT NULL
+                    GROUP BY k.id, k.wpis_id, k.tresc, k.data_dodania, k.usunieto, u.nazwa, k.autor_id
+                ) AS dane
+                WHERE 1=1 ' . $warunek_usunieto . '
+                ' . $order_sql
+            );
+            $zgloszenia_lista = $stmt_zgloszone->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania zgłoszeń: ' . $e->getMessage());
+        }
+
+        echo '<h1>Panel moderatora</h1>';
+
+        echo '<nav class="sortowanie-links">';
+        echo '<span>Sortuj: </span>';
+        $opcje_sortowania = [
+            'najnowsze'    => 'Najnowsze',
+            'najstarsze'   => 'Najstarsze',
+            'najczesciej'  => 'Najczęściej zgłaszane',
+            'wymoderowane' => 'Wymoderowane',
+        ];
+        foreach ($opcje_sortowania as $klucz => $etykieta) {
+            $aktywna = $klucz === $sortowanie ? ' class="aktywne"' : '';
+            echo '<a href="/panel_moderatora?sortowanie=' . $klucz . '"' . $aktywna . '>' . htmlspecialchars($etykieta, ENT_QUOTES, 'UTF-8') . '</a>';
+        }
+        echo '</nav>';
+
+        if (empty($zgloszenia_lista)) {
+            echo '<p class="empty-state">Brak zgłoszeń.</p>';
+        } else {
+            foreach ($zgloszenia_lista as $elem) {
+                $e_typ      = $elem['typ'];
+                $e_id       = (int)$elem['id'];
+                $e_autor    = htmlspecialchars($elem['autor'], ENT_QUOTES, 'UTF-8');
+                $e_data     = htmlspecialchars(date('d.m.Y H:i', strtotime($elem['data_dodania'])), ENT_QUOTES, 'UTF-8');
+                $e_usunieto = !empty($elem['usunieto']);
+                $e_liczba   = (int)$elem['liczba_zgloszen'];
+                $e_ost_zgl  = htmlspecialchars(date('d.m.Y H:i', strtotime($elem['ostatnie_zgloszenie'])), ENT_QUOTES, 'UTF-8');
+                $e_tresc    = htmlspecialchars(mb_strimwidth($elem['tresc'] ?? '', 0, 200, '…'), ENT_QUOTES, 'UTF-8');
+                $e_wpis_url = '/wpis/' . (int)$elem['wpis_powiazany_id'];
+
+                $klasa_item = 'panel-mod-item' . ($e_usunieto ? ' panel-mod-item--wymoderowany' : '');
+                echo '<div class="' . $klasa_item . '">';
+                echo '<div class="panel-mod-meta">';
+                echo '<strong>' . ($e_typ === 'wpis' ? 'Wpis' : 'Komentarz') . '</strong>';
+                echo ' · <a href="' . $e_wpis_url . '">otwórz wpis</a>';
+                echo ' · autor: <strong>' . $e_autor . '</strong>';
+                echo ' · ' . $e_data;
+                echo ' · zgłoszenia: <strong>' . $e_liczba . '</strong>';
+                echo ' · ostatnie: ' . $e_ost_zgl;
+                if ($e_usunieto) {
+                    echo ' · <em class="zgloszone-usunieto">usunięte</em>';
+                }
+                echo '</div>';
+                echo '<div class="panel-mod-tresc">' . $e_tresc . '</div>';
+                echo '<div class="panel-mod-akcje">';
+                if ($e_typ === 'wpis') {
+                    if ($e_usunieto) {
+                        echo '<form method="post" action="/moderuj_wpis" style="display:inline">'
+                           . '<input type="hidden" name="wpis_id" value="' . $e_id . '">'
+                           . '<input type="hidden" name="akcja" value="przywroc">'
+                           . '<button type="submit" class="btn-mod btn-mod--przywroc">MODERACJA: PRZYWRÓĆ</button>'
+                           . '</form>';
+                    } else {
+                        echo '<form method="post" action="/moderuj_wpis" style="display:inline">'
+                           . '<input type="hidden" name="wpis_id" value="' . $e_id . '">'
+                           . '<input type="hidden" name="akcja" value="usun">'
+                           . '<button type="submit" class="btn-mod btn-mod--usun">MODERACJA: USUŃ</button>'
+                           . '</form>';
+                    }
+                } else {
+                    if ($e_usunieto) {
+                        echo '<form method="post" action="/moderuj_komentarz" style="display:inline">'
+                           . '<input type="hidden" name="komentarz_id" value="' . $e_id . '">'
+                           . '<input type="hidden" name="akcja" value="przywroc">'
+                           . '<button type="submit" class="btn-mod btn-mod--przywroc">MODERACJA: PRZYWRÓĆ</button>'
+                           . '</form>';
+                    } else {
+                        echo '<form method="post" action="/moderuj_komentarz" style="display:inline">'
+                           . '<input type="hidden" name="komentarz_id" value="' . $e_id . '">'
+                           . '<input type="hidden" name="akcja" value="usun">'
+                           . '<button type="submit" class="btn-mod btn-mod--usun">MODERACJA: USUŃ</button>'
+                           . '</form>';
+                    }
+                }
+                echo '</div>';
+                echo '</div>';
+            }
+        }
+        break;
     case 'wyloguj':
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
@@ -2075,6 +2302,33 @@ $tresc = ob_get_clean();
         .glosy-lista li { padding: 1px 0; }
         .glos-plus { color: #060; font-weight: bold; }
         .glos-minus { color: #c00; font-weight: bold; }
+
+        /* ── Zgłaszanie ── */
+        .btn-zglos {
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: Verdana, Geneva, sans-serif;
+            font-size: 0.78rem;
+            color: #555;
+            cursor: pointer;
+        }
+        .btn-zglos:hover { color: #000; text-decoration: underline; }
+        .zglos-potwierdzenie { font-size: 0.78rem; color: #555; font-style: italic; }
+
+        /* ── Panel moderatora ── */
+        .sortowanie-links { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem; flex-wrap: wrap; }
+        .sortowanie-links a { color: #555; text-decoration: none; }
+        .sortowanie-links a:hover { text-decoration: underline; color: #000; }
+        .sortowanie-links a.aktywne { color: #000; font-weight: bold; text-decoration: underline; }
+        .panel-mod-item { border: 1px solid #e8e8e8; padding: 8px; margin-bottom: 0.5rem; }
+        .panel-mod-item--wymoderowany { opacity: 0.65; }
+        .panel-mod-meta { font-size: 0.78rem; color: #555; margin-bottom: 4px; }
+        .panel-mod-meta strong { color: #000; }
+        .panel-mod-meta a { color: #000; }
+        .panel-mod-tresc { font-size: 0.85rem; margin-bottom: 6px; word-break: break-word; }
+        .panel-mod-akcje { font-size: 0.78rem; }
+        .zgloszone-usunieto { color: #c00; }
     </style>
 </head>
 <body>
@@ -2090,6 +2344,10 @@ $tresc = ob_get_clean();
                 <span class="nav-sep">|</span>
                 <?php if (!empty($_SESSION['jest_adminem'])): ?>
                     <a href="/admin">Admin</a>
+                    <span class="nav-sep">|</span>
+                <?php endif; ?>
+                <?php if (!empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem'])): ?>
+                    <a href="/panel_moderatora">Moderacja</a>
                     <span class="nav-sep">|</span>
                 <?php endif; ?>
                 <a href="/wyloguj">Wyloguj</a>
