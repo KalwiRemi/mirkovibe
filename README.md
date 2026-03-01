@@ -19,3 +19,14 @@ Zapomnij o "best practices" kiedy piszesz kod. Kilka żelaznych zasad:
 - PHP
 - PostgreSQL
 - htmx
+
+## Deployment na Vercel
+
+1. Zaimportuj repozytorium w [Vercel](https://vercel.com/new).
+2. W ustawieniach projektu dodaj zmienne środowiskowe:
+   - `BAZA_HOST` – host bazy PostgreSQL
+   - `BAZA_NAZWA` – nazwa bazy danych
+   - `BAZA_UZYTKOWNIK` – użytkownik bazy danych
+   - `BAZA_HASLO` – hasło do bazy danych
+   - `APP_URL` – publiczny adres aplikacji (np. `https://mirkovibe.vercel.app`); opcjonalne, ale zalecane dla poprawnych linków
+3. Wdróż projekt. Konfiguracja `vercel.json` automatycznie kieruje wszystkie żądania do `index.php` przez środowisko uruchomieniowe PHP (`vercel-php@0.9.0`).
