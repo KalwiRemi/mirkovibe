@@ -12,6 +12,8 @@ define('APP_URL', rtrim(getenv('APP_URL') ?:
 define('NAZWA_ADMINISTRATORA', getenv('NAZWA_ADMINISTRATORA') ?: '');
 define('DOMYSLNY_CZAS_WPISU',       12);
 define('DOMYSLNY_CZAS_KOMENTARZA',   1);
+define('DOMYSLNY_LIMIT_WPISOW',      5);
+define('DOMYSLNY_LIMIT_KOMENTARZY', 20);
 
 try {
     $polaczenie = new PDO(
@@ -57,6 +59,39 @@ function sprawdzKarencje(PDO $polaczenie, int $uzytkownik_id, string $typ): floa
     } catch (PDOException $e) {
         error_log('Błąd sprawdzania karencji: ' . $e->getMessage());
         return 0.0;
+    }
+}
+
+function sprawdzLimitGodzinowy(PDO $polaczenie, int $uzytkownik_id, string $typ): bool {
+    static $limity = [];
+    if (!isset($limity[$typ])) {
+        $klucz    = $typ === 'wpis' ? 'limit_wpisow_godzina' : 'limit_komentarzy_godzina';
+        $domyslna = $typ === 'wpis' ? DOMYSLNY_LIMIT_WPISOW : DOMYSLNY_LIMIT_KOMENTARZY;
+        try {
+            $stmt_cfg = $polaczenie->prepare('SELECT wartosc FROM konfiguracja WHERE klucz = :klucz');
+            $stmt_cfg->execute([':klucz' => $klucz]);
+            $wartosc  = $stmt_cfg->fetchColumn();
+            $limity[$typ] = $wartosc !== false ? (int)$wartosc : $domyslna;
+        } catch (PDOException $e) {
+            error_log('Błąd pobierania limitu: ' . $e->getMessage());
+            $limity[$typ] = $domyslna;
+        }
+    }
+    $limit = $limity[$typ];
+    if ($limit <= 0) {
+        return false;
+    }
+    $tabela = ['wpis' => 'wpisy', 'komentarz' => 'komentarze'][$typ] ?? null;
+    if ($tabela === null) return false;
+    try {
+        $stmt = $polaczenie->prepare(
+            "SELECT COUNT(*) FROM $tabela WHERE autor_id = :autor_id AND data_dodania > NOW() - INTERVAL '1 hour'"
+        );
+        $stmt->execute([':autor_id' => $uzytkownik_id]);
+        return (int)$stmt->fetchColumn() >= $limit;
+    } catch (PDOException $e) {
+        error_log('Błąd sprawdzania limitu godzinowego: ' . $e->getMessage());
+        return false;
     }
 }
 
@@ -626,6 +661,10 @@ switch ($strona) {
                 }
             }
 
+            if (empty($bledy) && empty($_SESSION['jest_adminem']) && sprawdzLimitGodzinowy($polaczenie, (int)$_SESSION['uzytkownik_id'], 'wpis')) {
+                $bledy[] = 'Przekroczyłeś limit wpisów na godzinę. Spróbuj ponownie później.';
+            }
+
             if (empty($bledy)) {
                 if ($rodzaj_wpisany === 'link') {
                     $fragmenty = preg_split('/[\s,]+/', $tagi_wpisane, -1, PREG_SPLIT_NO_EMPTY);
@@ -929,6 +968,8 @@ switch ($strona) {
         $tresc_komentarza  = trim($_POST['tresc'] ?? '');
         if ($godziny_oczekiwania_komentarz > 0) {
             $blad_komentarza = '';
+        } elseif (empty($_SESSION['jest_adminem']) && !empty($tresc_komentarza) && sprawdzLimitGodzinowy($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')) {
+            $blad_komentarza = 'Przekroczyłeś limit komentarzy na godzinę. Spróbuj ponownie później.';
         } elseif (!empty($tresc_komentarza)) {
             if (strlen($tresc_komentarza) > 2000) {
                 $blad_komentarza = 'Komentarz nie może przekraczać 2000 znaków.';
@@ -1182,6 +1223,8 @@ switch ($strona) {
             $nowa_wartosc = (isset($_POST['rejestracja_wlaczona']) && $_POST['rejestracja_wlaczona'] === '1') ? 'true' : 'false';
             $czas_wpisu       = max(0, (int)($_POST['minimalny_czas_wpisu']       ?? DOMYSLNY_CZAS_WPISU));
             $czas_komentarza  = max(0, (int)($_POST['minimalny_czas_komentarza']  ?? DOMYSLNY_CZAS_KOMENTARZA));
+            $limit_wpisow     = max(0, (int)($_POST['limit_wpisow_godzina']       ?? DOMYSLNY_LIMIT_WPISOW));
+            $limit_komentarzy = max(0, (int)($_POST['limit_komentarzy_godzina']   ?? DOMYSLNY_LIMIT_KOMENTARZY));
             try {
                 $stmt_upd = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'rejestracja_wlaczona'");
                 $stmt_upd->execute([':wartosc' => $nowa_wartosc]);
@@ -1189,6 +1232,10 @@ switch ($strona) {
                 $stmt_upd2->execute([':wartosc' => (string)$czas_wpisu]);
                 $stmt_upd3 = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'minimalny_czas_komentarza'");
                 $stmt_upd3->execute([':wartosc' => (string)$czas_komentarza]);
+                $stmt_upd4 = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'limit_wpisow_godzina'");
+                $stmt_upd4->execute([':wartosc' => (string)$limit_wpisow]);
+                $stmt_upd5 = $polaczenie->prepare("UPDATE konfiguracja SET wartosc = :wartosc WHERE klucz = 'limit_komentarzy_godzina'");
+                $stmt_upd5->execute([':wartosc' => (string)$limit_komentarzy]);
                 $komunikat_admina = 'Konfiguracja została zapisana.';
             } catch (PDOException $e) {
                 error_log('Błąd zapisu konfiguracji: ' . $e->getMessage());
@@ -1199,12 +1246,16 @@ switch ($strona) {
         $rejestracja_wlaczona_cfg    = false;
         $minimalny_czas_wpisu_cfg    = DOMYSLNY_CZAS_WPISU;
         $minimalny_czas_komentarza_cfg = DOMYSLNY_CZAS_KOMENTARZA;
+        $limit_wpisow_cfg    = DOMYSLNY_LIMIT_WPISOW;
+        $limit_komentarzy_cfg = DOMYSLNY_LIMIT_KOMENTARZY;
         try {
-            $stmt_cfg2 = $polaczenie->query("SELECT klucz, wartosc FROM konfiguracja WHERE klucz IN ('rejestracja_wlaczona','minimalny_czas_wpisu','minimalny_czas_komentarza')");
+            $stmt_cfg2 = $polaczenie->query("SELECT klucz, wartosc FROM konfiguracja WHERE klucz IN ('rejestracja_wlaczona','minimalny_czas_wpisu','minimalny_czas_komentarza','limit_wpisow_godzina','limit_komentarzy_godzina')");
             foreach ($stmt_cfg2->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 if ($row['klucz'] === 'rejestracja_wlaczona')    $rejestracja_wlaczona_cfg    = ($row['wartosc'] === 'true');
                 if ($row['klucz'] === 'minimalny_czas_wpisu')    $minimalny_czas_wpisu_cfg    = (int)$row['wartosc'];
                 if ($row['klucz'] === 'minimalny_czas_komentarza') $minimalny_czas_komentarza_cfg = (int)$row['wartosc'];
+                if ($row['klucz'] === 'limit_wpisow_godzina')    $limit_wpisow_cfg    = (int)$row['wartosc'];
+                if ($row['klucz'] === 'limit_komentarzy_godzina') $limit_komentarzy_cfg = (int)$row['wartosc'];
             }
         } catch (PDOException $e) {
             error_log('Błąd odczytu konfiguracji: ' . $e->getMessage());
@@ -1235,6 +1286,13 @@ switch ($strona) {
         echo '</label>';
         echo '<label class="admin-label">Minimalny czas przed dodaniem komentarza (godz.):';
         echo '<input type="number" name="minimalny_czas_komentarza" value="' . $minimalny_czas_komentarza_cfg . '" min="0" style="width:80px;margin-left:0.5rem">';
+        echo '</label>';
+        echo '<h2>Limity godzinowe</h2>';
+        echo '<label class="admin-label">Maksymalna liczba wpisów na godzinę (0 = brak limitu):';
+        echo '<input type="number" name="limit_wpisow_godzina" value="' . $limit_wpisow_cfg . '" min="0" style="width:80px;margin-left:0.5rem">';
+        echo '</label>';
+        echo '<label class="admin-label">Maksymalna liczba komentarzy na godzinę (0 = brak limitu):';
+        echo '<input type="number" name="limit_komentarzy_godzina" value="' . $limit_komentarzy_cfg . '" min="0" style="width:80px;margin-left:0.5rem">';
         echo '</label>';
         echo '<button type="submit" class="btn-primary">Zapisz</button>';
         echo '</form>';
