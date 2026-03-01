@@ -88,6 +88,9 @@ CREATE INDEX glosy_komentarz_id_idx ON glosy (komentarz_id);
 CREATE FUNCTION dodaj_glos(p_uzytkownik_id INT, p_wpis_id INT, p_wartosc SMALLINT)
 RETURNS VOID AS $$
 BEGIN
+    IF EXISTS (SELECT 1 FROM wpisy WHERE id = p_wpis_id AND autor_id = p_uzytkownik_id) THEN
+        RETURN;
+    END IF;
     IF EXISTS (
         SELECT 1 FROM glosy
         WHERE uzytkownik_id = p_uzytkownik_id AND wpis_id = p_wpis_id AND wartosc = p_wartosc
@@ -109,6 +112,9 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
+    IF EXISTS (SELECT 1 FROM komentarze WHERE id = p_komentarz_id AND autor_id = p_uzytkownik_id) THEN
+        RETURN;
+    END IF;
     IF EXISTS (
         SELECT 1 FROM glosy
         WHERE uzytkownik_id = p_uzytkownik_id AND komentarz_id = p_komentarz_id AND wartosc = p_wartosc

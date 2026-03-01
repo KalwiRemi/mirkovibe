@@ -120,3 +120,50 @@ FROM wpisy w
 LEFT JOIN glosy g ON g.wpis_id = w.id
 GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj, w.usunieto;
 
+-- Migracja: blokada głosowania na własne wpisy i komentarze
+CREATE OR REPLACE FUNCTION dodaj_glos(p_uzytkownik_id INT, p_wpis_id INT, p_wartosc SMALLINT)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM wpisy WHERE id = p_wpis_id AND autor_id = p_uzytkownik_id) THEN
+        RETURN;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM glosy
+        WHERE uzytkownik_id = p_uzytkownik_id AND wpis_id = p_wpis_id AND wartosc = p_wartosc
+    ) THEN
+        DELETE FROM glosy WHERE uzytkownik_id = p_uzytkownik_id AND wpis_id = p_wpis_id;
+    ELSE
+        INSERT INTO glosy (uzytkownik_id, wpis_id, wartosc)
+        VALUES (p_uzytkownik_id, p_wpis_id, p_wartosc)
+        ON CONFLICT (uzytkownik_id, wpis_id)
+        DO UPDATE SET wartosc = EXCLUDED.wartosc;
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION dodaj_glos_komentarz(p_uzytkownik_id INT, p_komentarz_id INT, p_wartosc SMALLINT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM komentarze WHERE id = p_komentarz_id AND autor_id = p_uzytkownik_id) THEN
+        RETURN;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM glosy
+        WHERE uzytkownik_id = p_uzytkownik_id AND komentarz_id = p_komentarz_id AND wartosc = p_wartosc
+    ) THEN
+        DELETE FROM glosy WHERE uzytkownik_id = p_uzytkownik_id AND komentarz_id = p_komentarz_id;
+    ELSE
+        INSERT INTO glosy (uzytkownik_id, komentarz_id, wartosc)
+        VALUES (p_uzytkownik_id, p_komentarz_id, p_wartosc)
+        ON CONFLICT (uzytkownik_id, komentarz_id)
+        DO UPDATE SET wartosc = EXCLUDED.wartosc;
+    END IF;
+END;
+$$;
+
