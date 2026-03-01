@@ -131,6 +131,22 @@ BEGIN
 END;
 $$;
 
+CREATE TABLE zgloszenia (
+    id               SERIAL PRIMARY KEY,
+    wpis_id          INT REFERENCES wpisy(id) ON DELETE CASCADE,
+    komentarz_id     INT REFERENCES komentarze(id) ON DELETE CASCADE,
+    uzytkownik_id    INT REFERENCES uzytkownicy(id) ON DELETE CASCADE,
+    data_zgloszenia  TIMESTAMPTZ DEFAULT NOW(),
+    CHECK ((wpis_id IS NULL) <> (komentarz_id IS NULL))
+);
+
+CREATE UNIQUE INDEX zgloszenia_uzytkownik_wpis_uniq
+    ON zgloszenia (uzytkownik_id, wpis_id) WHERE wpis_id IS NOT NULL;
+CREATE UNIQUE INDEX zgloszenia_uzytkownik_komentarz_uniq
+    ON zgloszenia (uzytkownik_id, komentarz_id) WHERE komentarz_id IS NOT NULL;
+CREATE INDEX zgloszenia_wpis_id_idx ON zgloszenia (wpis_id) WHERE wpis_id IS NOT NULL;
+CREATE INDEX zgloszenia_komentarz_id_idx ON zgloszenia (komentarz_id) WHERE komentarz_id IS NOT NULL;
+
 CREATE FUNCTION zarejestruj_uzytkownika(p_nazwa TEXT, p_haslo TEXT)
 RETURNS VOID
 LANGUAGE plpgsql

@@ -126,6 +126,23 @@ FROM wpisy w
 LEFT JOIN glosy g ON g.wpis_id = w.id
 GROUP BY w.id, w.tytul, w.tresc, w.link, w.autor_id, w.data_dodania, w.rodzaj, w.usunieto;
 
+-- Migracja: system zgłaszania wpisów i komentarzy
+CREATE TABLE IF NOT EXISTS zgloszenia (
+    id               SERIAL PRIMARY KEY,
+    wpis_id          INT REFERENCES wpisy(id) ON DELETE CASCADE,
+    komentarz_id     INT REFERENCES komentarze(id) ON DELETE CASCADE,
+    uzytkownik_id    INT REFERENCES uzytkownicy(id) ON DELETE CASCADE,
+    data_zgloszenia  TIMESTAMPTZ DEFAULT NOW(),
+    CHECK ((wpis_id IS NULL) <> (komentarz_id IS NULL))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS zgloszenia_uzytkownik_wpis_uniq
+    ON zgloszenia (uzytkownik_id, wpis_id) WHERE wpis_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS zgloszenia_uzytkownik_komentarz_uniq
+    ON zgloszenia (uzytkownik_id, komentarz_id) WHERE komentarz_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS zgloszenia_wpis_id_idx ON zgloszenia (wpis_id) WHERE wpis_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS zgloszenia_komentarz_id_idx ON zgloszenia (komentarz_id) WHERE komentarz_id IS NOT NULL;
+
 -- Migracja: blokada głosowania na własne wpisy i komentarze
 CREATE OR REPLACE FUNCTION dodaj_glos(p_uzytkownik_id INT, p_wpis_id INT, p_wartosc SMALLINT)
 RETURNS VOID
