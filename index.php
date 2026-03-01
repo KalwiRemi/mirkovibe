@@ -96,20 +96,20 @@ function pobierzGlosyKomentarzy(PDO $polaczenie, int $uzytkownik_id, array $kome
     }
 }
 
-function renderujSekcjeGlosow(string $typ, int $id, int $wynik, bool $zalogowany, int $glos_uzytkownika = 0): string {
+function renderujSekcjeGlosow(string $typ, int $id, int $wynik, bool $zalogowany, int $glos_uzytkownika = 0, bool $jest_autorem = false): string {
     $trasa     = $typ === 'wpis' ? '/glosuj' : '/glosuj_komentarz';
     $pole_id   = $typ === 'wpis' ? 'wpis_id' : 'komentarz_id';
     $id_sekcji = 'glosy-' . $typ . '-' . $id;
     $id_wyniku = 'wynik-' . $typ . '-' . $id;
     $html  = '<div id="' . $id_sekcji . '" class="card-votes">';
-    if ($zalogowany) {
+    if ($zalogowany && !$jest_autorem) {
         $klasa_up = 'btn-vote up' . ($glos_uzytkownika === 1 ? ' active' : '');
         $html .= '<button type="button" class="' . $klasa_up . '" hx-post="' . $trasa . '" hx-target="#' . $id_sekcji . '" hx-swap="outerHTML" hx-vals=\'{"' . $pole_id . '":"' . $id . '","wartosc":"1"}\' aria-label="Zagłosuj za">▲</button>';
     } else {
         $html .= '<span class="vote-icon">▲</span>';
     }
     $html .= '<span id="' . $id_wyniku . '" class="score">' . $wynik . '</span>';
-    if ($zalogowany) {
+    if ($zalogowany && !$jest_autorem) {
         $klasa_down = 'btn-vote down' . ($glos_uzytkownika === -1 ? ' active' : '');
         $html .= '<button type="button" class="' . $klasa_down . '" hx-post="' . $trasa . '" hx-target="#' . $id_sekcji . '" hx-swap="outerHTML" hx-vals=\'{"' . $pole_id . '":"' . $id . '","wartosc":"-1"}\' aria-label="Zagłosuj przeciw">▼</button>';
     } else {
@@ -119,18 +119,19 @@ function renderujSekcjeGlosow(string $typ, int $id, int $wynik, bool $zalogowany
     return $html;
 }
 
-function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $glosy, array $dzieci, int $glebokosc = 0, bool $jest_moderatorem = false): string {
-    $k_id      = (int)$komentarz['id'];
-    $k_autor   = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
-    $k_tresc   = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
-    $k_data    = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
-    $k_wynik   = (int)($komentarz['wynik'] ?? 0);
-    $k_glos    = (int)($glosy[$k_id] ?? 0);
-    $usunieto  = !empty($komentarz['usunieto']);
+function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $glosy, array $dzieci, int $glebokosc = 0, bool $jest_moderatorem = false, int $uzytkownik_id = 0): string {
+    $k_id           = (int)$komentarz['id'];
+    $k_autor        = htmlspecialchars($komentarz['autor'], ENT_QUOTES, 'UTF-8');
+    $k_tresc        = htmlspecialchars($komentarz['tresc'], ENT_QUOTES, 'UTF-8');
+    $k_data         = htmlspecialchars(date('d.m.Y H:i', strtotime($komentarz['data_dodania'])), ENT_QUOTES, 'UTF-8');
+    $k_wynik        = (int)($komentarz['wynik'] ?? 0);
+    $k_glos         = (int)($glosy[$k_id] ?? 0);
+    $usunieto       = !empty($komentarz['usunieto']);
+    $jest_autorem_k = $uzytkownik_id > 0 && $uzytkownik_id === (int)($komentarz['autor_id'] ?? 0);
 
     $html  = '<li class="comment-item">';
     $html .= '<div class="card-layout">';
-    $html .= renderujSekcjeGlosow('komentarz', $k_id, $k_wynik, $zalogowany, $k_glos);
+    $html .= renderujSekcjeGlosow('komentarz', $k_id, $k_wynik, $zalogowany, $k_glos, $jest_autorem_k);
     $html .= '<div class="card-content">';
     $html .= '<div class="card-header">';
     $html .= '<strong class="card-author">' . $k_autor . '</strong>';
@@ -166,7 +167,7 @@ function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $gl
     if (!empty($dzieci[$k_id]) && $glebokosc < 10) {
         $html .= '<ul class="comment-list comment-list--zagniezdzone">';
         foreach ($dzieci[$k_id] as $dziecko) {
-            $html .= renderujElementKomentarza($dziecko, $zalogowany, $glosy, $dzieci, $glebokosc + 1, $jest_moderatorem);
+            $html .= renderujElementKomentarza($dziecko, $zalogowany, $glosy, $dzieci, $glebokosc + 1, $jest_moderatorem, $uzytkownik_id);
         }
         $html .= '</ul>';
     }
@@ -175,7 +176,7 @@ function renderujElementKomentarza(array $komentarz, bool $zalogowany, array $gl
     return $html;
 }
 
-function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0, array $glosy_uzytkownika = [], bool $jest_moderatorem = false): string {
+function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, string $blad = '', float $godziny_oczekiwania = 0.0, array $glosy_uzytkownika = [], bool $jest_moderatorem = false, int $uzytkownik_id = 0): string {
     $html  = '<div id="komentarze-sekcja">';
     $html .= '<section class="comments-section">';
 
@@ -192,7 +193,7 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
         }
         $html .= '<ul class="comment-list">';
         foreach ($korzenie as $k) {
-            $html .= renderujElementKomentarza($k, $zalogowany, $glosy_uzytkownika, $dzieci, 0, $jest_moderatorem);
+            $html .= renderujElementKomentarza($k, $zalogowany, $glosy_uzytkownika, $dzieci, 0, $jest_moderatorem, $uzytkownik_id);
         }
         $html .= '</ul>';
     }
@@ -217,19 +218,20 @@ function renderujKomentarze(array $komentarze, int $wpis_id, bool $zalogowany, s
     $html .= '</div>';
     return $html;
 }
-function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika = 0, bool $jest_moderatorem = false): string {
-    $rodzaj     = $wpis['rodzaj'] ?? 'wpis';
-    $autor      = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
-    $wynik      = (int)$wpis['wynik'];
-    $komentarze = (int)($wpis['liczba_komentarzy'] ?? 0);
-    $data       = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
-    $id         = (int)$wpis['id'];
-    $usunieto   = !empty($wpis['usunieto']);
+function renderujKarteWpisu(array $wpis, bool $zalogowany, int $glos_uzytkownika = 0, bool $jest_moderatorem = false, int $uzytkownik_id = 0): string {
+    $rodzaj          = $wpis['rodzaj'] ?? 'wpis';
+    $autor           = htmlspecialchars($wpis['autor'], ENT_QUOTES, 'UTF-8');
+    $wynik           = (int)$wpis['wynik'];
+    $komentarze      = (int)($wpis['liczba_komentarzy'] ?? 0);
+    $data            = htmlspecialchars(date('d.m.Y H:i', strtotime($wpis['data_dodania'])), ENT_QUOTES, 'UTF-8');
+    $id              = (int)$wpis['id'];
+    $usunieto        = !empty($wpis['usunieto']);
+    $jest_autorem_w  = $uzytkownik_id > 0 && $uzytkownik_id === (int)($wpis['autor_id'] ?? 0);
 
     $html  = '<li class="card">';
     $html .= '<div class="card-layout">';
 
-    $html .= renderujSekcjeGlosow('wpis', $id, $wynik, $zalogowany, $glos_uzytkownika);
+    $html .= renderujSekcjeGlosow('wpis', $id, $wynik, $zalogowany, $glos_uzytkownika, $jest_autorem_w);
 
     $html .= '<div class="card-content">';
     $html .= '<div class="card-header">';
@@ -385,12 +387,12 @@ switch ($strona) {
             $liczba_wpisow = (int)$stmt_licznik->fetchColumn();
 
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania, w.usunieto,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.autor_id, w.wynik, w.data_dodania, w.usunieto,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
-                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania, w.usunieto
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.autor_id, w.wynik, w.data_dodania, w.usunieto
                  ORDER BY w.data_dodania DESC
                  LIMIT :limit OFFSET :offset'
             );
@@ -417,7 +419,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']));
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']), (int)($_SESSION['uzytkownik_id'] ?? 0));
             }
             echo '</ul>';
         }
@@ -441,13 +443,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania, w.usunieto,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.autor_id, w.wynik, w.data_dodania, w.usunieto,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
                  WHERE w.id = :id
-                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania, w.usunieto'
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.autor_id, w.wynik, w.data_dodania, w.usunieto'
             );
             $stmt->execute([':id' => $wpis_id]);
             $wpis = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -469,6 +471,7 @@ switch ($strona) {
         $zalogowany_wpis   = isset($_SESSION['uzytkownik_id']);
         $usunieto_wpis     = !empty($wpis['usunieto']);
         $jest_mod_lub_adm  = !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']);
+        $jest_autorem_wpis = $zalogowany_wpis && (int)($_SESSION['uzytkownik_id'] ?? 0) === (int)($wpis['autor_id'] ?? 0);
 
         $glos_wpisu = 0;
         if ($zalogowany_wpis) {
@@ -483,7 +486,7 @@ switch ($strona) {
 
         echo '<div class="card card-layout card-layout--detail">';
 
-        echo renderujSekcjeGlosow('wpis', $wpis_id, $wynik, $zalogowany_wpis, $glos_wpisu);
+        echo renderujSekcjeGlosow('wpis', $wpis_id, $wynik, $zalogowany_wpis, $glos_wpisu, $jest_autorem_wpis);
 
         echo '<div class="card-content">';
         echo '<div class="card-header">';
@@ -546,13 +549,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa AS autor, k.autor_id, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
-                 GROUP BY k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa, k.data_dodania
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa, k.autor_id, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -572,7 +575,8 @@ switch ($strona) {
                 ? sprawdzKarencje($polaczenie, (int)$_SESSION['uzytkownik_id'], 'komentarz')
                 : 0.0,
             $glosy_komentarzy,
-            !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem'])
+            !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']),
+            (int)($_SESSION['uzytkownik_id'] ?? 0)
         );
         break;
     case 'dodaj':
@@ -958,13 +962,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa AS autor, k.autor_id, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.wpis_id = :wpis_id
-                 GROUP BY k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa, k.data_dodania
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.usunieto, u.nazwa, k.autor_id, k.data_dodania
                  ORDER BY k.data_dodania ASC'
             );
             $stmt->execute([':wpis_id' => $wpis_id]);
@@ -976,7 +980,7 @@ switch ($strona) {
 
         $glosy_komentarzy = pobierzGlosyKomentarzy($polaczenie, (int)$_SESSION['uzytkownik_id'], $komentarze);
 
-        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza, $godziny_oczekiwania_komentarz, $glosy_komentarzy, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']));
+        echo renderujKomentarze($komentarze, $wpis_id, true, $blad_komentarza, $godziny_oczekiwania_komentarz, $glosy_komentarzy, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']), (int)$_SESSION['uzytkownik_id']);
         exit;
     case 'glosuj':
         ob_end_clean();
@@ -994,6 +998,18 @@ switch ($strona) {
         }
 
         try {
+            $stmt_autor = $polaczenie->prepare('SELECT autor_id FROM wpisy WHERE id = :id');
+            $stmt_autor->execute([':id' => $wpis_id]);
+            $wpis_autor_id = $stmt_autor->fetchColumn();
+            if ($wpis_autor_id === false) {
+                http_response_code(404);
+                exit;
+            }
+            if ((int)$wpis_autor_id === (int)$_SESSION['uzytkownik_id']) {
+                http_response_code(403);
+                exit;
+            }
+
             $stmt = $polaczenie->prepare('SELECT dodaj_glos(:uzytkownik_id, :wpis_id, CAST(:wartosc AS SMALLINT))');
             $stmt->bindValue(':uzytkownik_id', $_SESSION['uzytkownik_id'], PDO::PARAM_INT);
             $stmt->bindValue(':wpis_id',       $wpis_id,                   PDO::PARAM_INT);
@@ -1036,6 +1052,18 @@ switch ($strona) {
         }
 
         try {
+            $stmt_autor_k = $polaczenie->prepare('SELECT autor_id FROM komentarze WHERE id = :id');
+            $stmt_autor_k->execute([':id' => $komentarz_id]);
+            $komentarz_autor_id = $stmt_autor_k->fetchColumn();
+            if ($komentarz_autor_id === false) {
+                http_response_code(404);
+                exit;
+            }
+            if ((int)$komentarz_autor_id === (int)$_SESSION['uzytkownik_id']) {
+                http_response_code(403);
+                exit;
+            }
+
             $stmt = $polaczenie->prepare('SELECT dodaj_glos_komentarz(:uzytkownik_id, :komentarz_id, CAST(:wartosc AS SMALLINT))');
             $stmt->bindValue(':uzytkownik_id', $_SESSION['uzytkownik_id'], PDO::PARAM_INT);
             $stmt->bindValue(':komentarz_id',  $komentarz_id,              PDO::PARAM_INT);
@@ -1073,13 +1101,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.wynik, w.data_dodania, w.usunieto,
+                'SELECT w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa AS autor, w.autor_id, w.wynik, w.data_dodania, w.usunieto,
                         COUNT(k.id) AS liczba_komentarzy
                  FROM wpisy_z_wynikiem w
                  JOIN uzytkownicy u ON u.id = w.autor_id
                  LEFT JOIN komentarze k ON k.wpis_id = w.id
                  WHERE w.tresc ~* :pattern
-                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.wynik, w.data_dodania, w.usunieto
+                 GROUP BY w.id, w.tytul, w.tresc, w.link, w.rodzaj, u.nazwa, w.autor_id, w.wynik, w.data_dodania, w.usunieto
                  ORDER BY w.data_dodania DESC'
             );
             $stmt->execute([':pattern' => '(^|[^[:alnum:]_#])#' . $tag_nazwa . '([^[:alnum:]_]|$)']);
@@ -1100,7 +1128,7 @@ switch ($strona) {
         } else {
             echo '<ul class="card-list">';
             foreach ($wpisy as $wpis) {
-                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']));
+                echo renderujKarteWpisu($wpis, isset($_SESSION['uzytkownik_id']), $glosy_uzytkownika_wpisy[(int)$wpis['id']] ?? 0, !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']), (int)($_SESSION['uzytkownik_id'] ?? 0));
             }
             echo '</ul>';
         }
@@ -1378,13 +1406,13 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare(
-                'SELECT k.id, k.tresc, k.rodzic_id, k.wpis_id, k.usunieto, u.nazwa AS autor, k.data_dodania,
+                'SELECT k.id, k.tresc, k.rodzic_id, k.wpis_id, k.usunieto, u.nazwa AS autor, k.autor_id, k.data_dodania,
                         COALESCE(SUM(g.wartosc), 0) AS wynik
                  FROM komentarze k
                  JOIN uzytkownicy u ON u.id = k.autor_id
                  LEFT JOIN glosy g ON g.komentarz_id = k.id
                  WHERE k.id = :id
-                 GROUP BY k.id, k.tresc, k.rodzic_id, k.wpis_id, k.usunieto, u.nazwa, k.data_dodania'
+                 GROUP BY k.id, k.tresc, k.rodzic_id, k.wpis_id, k.usunieto, u.nazwa, k.autor_id, k.data_dodania'
             );
             $stmt->execute([':id' => $komentarz_id]);
             $komentarz = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1402,6 +1430,7 @@ switch ($strona) {
         $zalogowany_k    = isset($_SESSION['uzytkownik_id']);
         $jest_mod_k      = !empty($_SESSION['jest_adminem']) || !empty($_SESSION['jest_moderatorem']);
         $usunieto_k      = !empty($komentarz['usunieto']);
+        $jest_autorem_k  = $zalogowany_k && (int)($_SESSION['uzytkownik_id'] ?? 0) === (int)($komentarz['autor_id'] ?? 0);
 
         echo '<p><a href="/wpis/' . $wpis_id_k . '">← Wróć do wpisu</a></p>';
 
@@ -1422,7 +1451,7 @@ switch ($strona) {
         }
 
         echo '<div class="card card-layout card-layout--detail">';
-        echo renderujSekcjeGlosow('komentarz', $komentarz_id, $k_wynik, $zalogowany_k, $glos_k);
+        echo renderujSekcjeGlosow('komentarz', $komentarz_id, $k_wynik, $zalogowany_k, $glos_k, $jest_autorem_k);
         echo '<div class="card-content">';
         echo '<div class="card-header">';
         echo '<strong class="card-author">' . $k_autor . '</strong>';
