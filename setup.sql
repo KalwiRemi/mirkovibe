@@ -19,6 +19,8 @@ CREATE TABLE konfiguracja (
 INSERT INTO konfiguracja (klucz, wartosc) VALUES ('rejestracja_wlaczona', 'false');
 INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_wpisu', '12');
 INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_komentarza', '1');
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('limit_wpisow_godzina', '5');
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('limit_komentarzy_godzina', '20');
 
 CREATE TABLE wpisy (
     id           SERIAL PRIMARY KEY,

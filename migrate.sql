@@ -67,6 +67,12 @@ INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_wpisu', '12')
 INSERT INTO konfiguracja (klucz, wartosc) VALUES ('minimalny_czas_komentarza', '1')
     ON CONFLICT (klucz) DO NOTHING;
 
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('limit_wpisow_godzina', '5')
+    ON CONFLICT (klucz) DO NOTHING;
+
+INSERT INTO konfiguracja (klucz, wartosc) VALUES ('limit_komentarzy_godzina', '20')
+    ON CONFLICT (klucz) DO NOTHING;
+
 DROP VIEW IF EXISTS wpisy_z_wynikiem;
 
 -- Migracja: weryfikacja email podczas rejestracji

@@ -68,6 +68,8 @@ Zalogowany użytkownik może dodać jeden z dwóch rodzajów wpisów. Na stronie
 
 > **Uwaga:** Nowi użytkownicy muszą poczekać określony czas po rejestracji, zanim będą mogli dodać wpis. Domyślnie jest to **12 godzin**. Jeśli czas jeszcze nie upłynął, wyświetlana jest informacja „Możesz dodać wpis za X godzin".
 
+> **Limit godzinowy:** Użytkownicy mogą dodać maksymalnie **5 wpisów na godzinę** (domyślnie). Przekroczenie limitu skutkuje komunikatem błędu. Administratorzy nie podlegają temu ograniczeniu.
+
 ### Wpis
 Zwykły wpis tekstowy. Wymagane:
 - **Treść** – wymagana (bez tytułu i URL).
@@ -115,6 +117,8 @@ Zalogowani użytkownicy mogą dodawać komentarze do wpisów. Komentarz:
 
 > **Uwaga:** Nowi użytkownicy muszą poczekać określony czas po rejestracji, zanim będą mogli dodać komentarz. Domyślnie jest to **1 godzina**. Jeśli czas jeszcze nie upłynął, wyświetlana jest informacja „Możesz dodać komentarz za X godzin".
 
+> **Limit godzinowy:** Użytkownicy mogą dodać maksymalnie **20 komentarzy na godzinę** (domyślnie). Przekroczenie limitu skutkuje komunikatem błędu. Administratorzy nie podlegają temu ograniczeniu.
+
 Komentarze są **zagnieżdżone** – wyświetlane jako drzewo. Każdy komentarz może mieć dowolną liczbę odpowiedzi, a każda odpowiedź może być zagnieżdżona kolejny poziom głębiej (do 10 poziomów). Wcięcia i pionowa linia po lewej stronie wizualizują głębokość zagnieżdżenia.
 
 Przy każdym komentarzu widoczny jest link **odpowiedz**, który przenosi użytkownika na dedykowaną stronę komentarza (`/komentarz/{id}`). Na tej stronie wyświetlane są: treść komentarza, istniejące odpowiedzi (jako drzewo) oraz formularz dodania odpowiedzi.
@@ -155,6 +159,8 @@ W panelu administrator może:
 - **Włączyć lub wyłączyć rejestrację** – checkbox „Rejestracja włączona". Gdy rejestracja jest wyłączona, strona `/rejestracja` wyświetla komunikat „Rejestracja wyłączona" dla zwykłych użytkowników.
 - **Ustawić minimalny czas przed dodaniem wpisu** – pole liczbowe „Minimalny czas przed dodaniem wpisu (godz.)". Domyślnie **12 godzin**.
 - **Ustawić minimalny czas przed dodaniem komentarza** – pole liczbowe „Minimalny czas przed dodaniem komentarza (godz.)". Domyślnie **1 godzina**.
+- **Ustawić limit wpisów na godzinę** – pole liczbowe „Maksymalna liczba wpisów na godzinę". Wartość 0 oznacza brak limitu. Domyślnie **5**.
+- **Ustawić limit komentarzy na godzinę** – pole liczbowe „Maksymalna liczba komentarzy na godzinę". Wartość 0 oznacza brak limitu. Domyślnie **20**.
 - **Zarządzać moderatorami** – sekcja „Moderatorzy" umożliwia mianowanie dowolnego użytkownika moderatorem (podając jego nazwę) lub odebranie mu tej roli przyciskiem „Usuń" przy jego nazwie na liście. Administratorzy nie mogą być jednocześnie moderatorami (próba zmiany ich roli jest blokowana). Lista aktualnych moderatorów wyświetlana jest bezpośrednio w panelu.
 
 Dostęp do panelu wymaga zalogowania jako administrator. Próba wejścia bez uprawnień zwraca błąd 403.
