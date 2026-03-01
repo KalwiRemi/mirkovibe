@@ -1424,7 +1424,7 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare('UPDATE wpisy SET usunieto = :usunieto WHERE id = :id');
-            $stmt->execute([':usunieto' => ($akcja === 'usun'), ':id' => $wpis_id]);
+            $stmt->execute([':usunieto' => ($akcja === 'usun') ? 'true' : 'false', ':id' => $wpis_id]);
         } catch (PDOException $e) {
             error_log('Błąd moderacji wpisu: ' . $e->getMessage());
         }
@@ -1450,7 +1450,7 @@ switch ($strona) {
 
         try {
             $stmt = $polaczenie->prepare('UPDATE komentarze SET usunieto = :usunieto WHERE id = :id');
-            $stmt->execute([':usunieto' => ($akcja === 'usun'), ':id' => $komentarz_id]);
+            $stmt->execute([':usunieto' => ($akcja === 'usun') ? 'true' : 'false', ':id' => $komentarz_id]);
         } catch (PDOException $e) {
             error_log('Błąd moderacji komentarza: ' . $e->getMessage());
         }
